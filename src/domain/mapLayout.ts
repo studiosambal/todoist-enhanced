@@ -1,14 +1,19 @@
 /**
  * Where each mark of the project map goes.
  *
- * A tree drawn as clusters: a node sits in the middle of the things it holds,
- * and each of those, with everything it holds in turn, is packed around it as
- * one disc. So a branch stays together, no two marks overlap, and no line ever
- * has to cross another branch to reach its parent.
+ * In two steps. First the tree is drawn as clusters: a node sits by the things
+ * it holds, and each of those, with everything it holds in turn, is packed
+ * around it as one disc. That gives every branch a place of its own, with no
+ * two marks overlapping and no branch tangled in another — but with a lot of
+ * empty paper between the discs. So the marks are then let settle: each is
+ * drawn towards its parent like a weight on a spring, nothing is allowed to
+ * overlap, and the whole is pulled gently towards the centre, a little harder
+ * from above and below than from the sides, because a window is wider than
+ * it is tall.
  *
- * Worked out, not simulated: the same tree always lands in the same place, so
- * a project is found where it was yesterday, and nothing moves while the page
- * is being read.
+ * Worked out, not left to chance: there is no random number anywhere in it,
+ * so the same tree always lands in the same place. A project is found where
+ * it was yesterday, and nothing moves while the page is being read.
  */
 
 export interface LayoutNode {
@@ -38,6 +43,8 @@ export interface LayoutOptions {
   minClear?: number;
   /** Space left between two discs. */
   gap?: number;
+  /** The second step. Off, the clusters are returned as first drawn. */
+  settle?: boolean;
 }
 
 interface Packed {
@@ -63,8 +70,10 @@ interface Packed {
 const ANGLE_STEPS = 96;
 const DISTANCE_STEP = 5;
 const TURN = Math.PI * 2;
-/** Straight up: where the first branch of the root goes, and "away from the parent" for every other node. */
+/** Straight up: "away from the parent", in a node's own frame. */
 const AWAY = -Math.PI / 2;
+/** To the left: where the first branch of the root goes, so two branches sit side by side in a wide window. */
+const FIRST = Math.PI;
 /** Straight down: where a node's parent is, in the node's own frame. */
 const BACK = Math.PI / 2;
 /** The slice kept clear on each side of the line back to the parent. */
@@ -109,13 +118,13 @@ function ring(
   if (taken > room) return null;
 
   /* Round the root the spare room is shared out evenly and the first child is
-     centred straight up. Round any other node the fan is centred on the way
+     centred on the left. Round any other node the fan is centred on the way
      out, and only opens as wide as it needs. */
   const spare = isRoot
     ? (room - taken) / slots.length
     : Math.min(MAX_SPARE, (room - taken) / slots.length);
   let angle = isRoot
-    ? AWAY - slots[0].half
+    ? FIRST - slots[0].half
     : AWAY - (taken + spare * (slots.length - 1)) / 2;
   return slots.map((slot) => {
     const at = angle + slot.half;
@@ -166,7 +175,7 @@ function spiral(
     .sort((a, b) => b.packed.radius - a.packed.radius || a.index - b.index);
 
   const placed: Packed['children'] = [];
-  let angle = AWAY;
+  let angle = isRoot ? FIRST : AWAY;
 
   for (const { packed } of order) {
     const apart = (x: number, y: number) => placed.every((other) =>
@@ -236,15 +245,93 @@ function pack(node: LayoutNode, options: Required<LayoutOptions>, isRoot: boolea
   return { node, ...enclose(clear, children, isRoot), children };
 }
 
+/** How many rounds the marks are given to settle, and how many more to stop touching. */
+const SETTLE_ROUNDS = 260;
+const UNTANGLE_ROUNDS = 40;
+/** How much slack a line to a parent has beyond the two marks it joins. */
+const LINE_SLACK = 40;
+
+/**
+ * Lets the marks settle from where the clusters put them (see the top).
+ *
+ * Plain relaxation, in a fixed order with fixed constants. Each round pulls
+ * every child towards the right distance from its parent, pulls everything
+ * towards the centre, and then pushes apart whatever overlaps; the pulls fade
+ * out over the rounds and the pushing does not, so the last thing that
+ * happens to any two marks is that they stop touching.
+ */
+function settle(nodes: PlacedNode[], settings: Required<LayoutOptions>): void {
+  if (nodes.length < 3) return;
+  const index = new Map(nodes.map((node, i) => [node.id, i]));
+  const clear = nodes.map((node) => Math.max(node.r + settings.labelRoom, settings.minClear));
+  const links = nodes
+    .map((node, i) => ({ child: i, parent: node.parentId === null ? -1 : index.get(node.parentId) ?? -1 }))
+    .filter((link) => link.parent >= 0);
+
+  const separate = () => {
+    for (let i = 0; i < nodes.length; i += 1) {
+      for (let j = i + 1; j < nodes.length; j += 1) {
+        const a = nodes[i];
+        const b = nodes[j];
+        const need = clear[i] + clear[j] + settings.gap;
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let distance = Math.hypot(dx, dy);
+        if (distance >= need) continue;
+        if (distance < 0.01) {
+          /* Two marks on the same spot have no direction to part in: one is
+             given, the same every time. */
+          dx = 1 + (i % 3);
+          dy = 1 + (j % 5);
+          distance = Math.hypot(dx, dy);
+        }
+        const push = (need - distance) / distance / 2;
+        /* The root stays at the centre; whatever touches it gives all the way. */
+        const aFixed = a.parentId === null;
+        const bFixed = b.parentId === null;
+        if (!aFixed) { a.x -= dx * push * (bFixed ? 2 : 1); a.y -= dy * push * (bFixed ? 2 : 1); }
+        if (!bFixed) { b.x += dx * push * (aFixed ? 2 : 1); b.y += dy * push * (aFixed ? 2 : 1); }
+      }
+    }
+  };
+
+  for (let round = 0; round < SETTLE_ROUNDS; round += 1) {
+    const heat = 1 - round / SETTLE_ROUNDS;
+    for (const link of links) {
+      const child = nodes[link.child];
+      const parent = nodes[link.parent];
+      const rest = child.r + parent.r + LINE_SLACK;
+      const dx = child.x - parent.x;
+      const dy = child.y - parent.y;
+      const distance = Math.hypot(dx, dy) || 1;
+      const pull = ((distance - rest) / distance) * 0.3 * heat;
+      /* A parent with the whole map hanging from it would be dragged about by
+         every child; it gives a little, the child gives most. */
+      const give = parent.parentId === null ? 0 : 0.25;
+      child.x -= dx * pull * (1 - give);
+      child.y -= dy * pull * (1 - give);
+      parent.x += dx * pull * give;
+      parent.y += dy * pull * give;
+    }
+    for (const node of nodes) {
+      if (node.parentId === null) continue;
+      node.x -= node.x * 0.012 * heat;
+      node.y -= node.y * 0.03 * heat;
+    }
+    separate();
+  }
+  for (let round = 0; round < UNTANGLE_ROUNDS; round += 1) separate();
+}
+
 /** Lays a tree out around its root, which lands on (0, 0). */
 export function layoutMap(root: LayoutNode, options: LayoutOptions = {}): MapLayout {
   const settings: Required<LayoutOptions> = {
     labelRoom: options.labelRoom ?? 20,
     minClear: options.minClear ?? 44,
     gap: options.gap ?? 6,
+    settle: options.settle ?? true,
   };
   const nodes: PlacedNode[] = [];
-  const bounds = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
 
   /* `turn` is how far the node's own frame is turned so that its "back" points
      at its real parent. Turning a cluster about its centre keeps it inside its
@@ -252,11 +339,6 @@ export function layoutMap(root: LayoutNode, options: LayoutOptions = {}): MapLay
   const place = (packed: Packed, x: number, y: number, parentId: string | null, turn: number) => {
     const { node } = packed;
     nodes.push({ id: node.id, parentId, x, y, r: node.r });
-    const reach = Math.max(node.r + settings.labelRoom, settings.minClear);
-    bounds.x0 = Math.min(bounds.x0, x - reach);
-    bounds.x1 = Math.max(bounds.x1, x + reach);
-    bounds.y0 = Math.min(bounds.y0, y - reach);
-    bounds.y1 = Math.max(bounds.y1, y + reach);
     for (const child of packed.children) {
       const at = Math.atan2(child.y, child.x) + turn;
       /* The child itself sits short of its disc's centre, nearer this node. */
@@ -266,7 +348,16 @@ export function layoutMap(root: LayoutNode, options: LayoutOptions = {}): MapLay
     }
   };
   place(pack(root, settings, true), 0, 0, null, 0);
+  if (settings.settle) settle(nodes, settings);
 
+  const bounds = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+  for (const node of nodes) {
+    const reach = Math.max(node.r + settings.labelRoom, settings.minClear);
+    bounds.x0 = Math.min(bounds.x0, node.x - reach);
+    bounds.x1 = Math.max(bounds.x1, node.x + reach);
+    bounds.y0 = Math.min(bounds.y0, node.y - reach);
+    bounds.y1 = Math.max(bounds.y1, node.y + reach);
+  }
   return { nodes, bounds };
 }
 

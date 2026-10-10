@@ -9,21 +9,30 @@ const many = (prefix: string, count: number, r = 10) =>
   Array.from({ length: count }, (_, i) => leaf(`${prefix}${i}`, r + (i % 4) * 6));
 
 const OPTIONS = { labelRoom: 20, minClear: 44, gap: 6 };
+/** The clusters as first drawn, before the marks settle. */
+const DRAWN = { ...OPTIONS, settle: false };
 const clear = (node: PlacedNode) => Math.max(node.r + OPTIONS.labelRoom, OPTIONS.minClear);
 const distance = (a: PlacedNode, b: PlacedNode) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /** Every pair of marks keeps its label room, whichever branches they are in. */
-function overlaps(nodes: PlacedNode[]): string[] {
+function overlaps(nodes: PlacedNode[], tolerance = 0.001): string[] {
   const found: string[] = [];
   for (let i = 0; i < nodes.length; i += 1) {
     for (let j = i + 1; j < nodes.length; j += 1) {
-      if (distance(nodes[i], nodes[j]) < clear(nodes[i]) + clear(nodes[j]) - 0.001) {
+      if (distance(nodes[i], nodes[j]) < clear(nodes[i]) + clear(nodes[j]) - tolerance) {
         found.push(`${nodes[i].id}/${nodes[j].id}`);
       }
     }
   }
   return found;
 }
+
+const crowded = () => hub('root', [
+  hub('work', many('w', 14)), hub('team', [hub('cars', many('c', 12)), hub('boats', many('b', 9))]),
+  hub('home', [hub('recipes', many('r', 3), 48), ...many('h', 5)]), ...many('loose', 4, 30),
+]);
+const area = ({ bounds }: { bounds: { x0: number; y0: number; x1: number; y1: number } }) =>
+  (bounds.x1 - bounds.x0) * (bounds.y1 - bounds.y0);
 
 describe('layoutMap', () => {
   it('puts the root at the centre and names every node once', () => {
@@ -38,31 +47,54 @@ describe('layoutMap', () => {
 
   it('never lets two marks overlap, in one ring or in several', () => {
     const few = hub('root', [hub('a', many('a', 4)), hub('b', many('b', 2))]);
-    expect(overlaps(layoutMap(few, OPTIONS).nodes)).toEqual([]);
-
-    const crowded = hub('root', [
-      hub('work', many('w', 14)), hub('team', [hub('cars', many('c', 12)), hub('boats', many('b', 9))]),
-      hub('home', [hub('recipes', many('r', 3), 48), ...many('h', 5)]), ...many('loose', 4, 30),
-    ]);
-    expect(overlaps(layoutMap(crowded, OPTIONS).nodes)).toEqual([]);
+    expect(overlaps(layoutMap(few, DRAWN).nodes)).toEqual([]);
+    expect(overlaps(layoutMap(crowded(), DRAWN).nodes)).toEqual([]);
   });
 
-  it('spreads a few branches round the root rather than stacking them on one side', () => {
-    const { nodes } = layoutMap(hub('root', [leaf('north'), leaf('south')]), OPTIONS);
-    const north = nodes.find((n) => n.id === 'north')!;
-    const south = nodes.find((n) => n.id === 'south')!;
-    expect(north.y).toBeLessThan(0);
-    expect(south.y).toBeGreaterThan(0);
-    expect(Math.abs(north.x) + Math.abs(south.x)).toBeLessThan(1);
+  it('settles into less paper without letting marks touch, and keeps the root at the centre', () => {
+    const drawn = layoutMap(crowded(), DRAWN);
+    const settled = layoutMap(crowded(), OPTIONS);
+    expect(overlaps(settled.nodes, 1)).toEqual([]);
+    expect(area(settled)).toBeLessThan(area(drawn) * 0.6);
+    expect(settled.nodes.find((n) => n.id === 'root')).toMatchObject({ x: 0, y: 0 });
+    for (const node of settled.nodes) {
+      expect(Number.isFinite(node.x) && Number.isFinite(node.y)).toBe(true);
+    }
   });
 
-  it('fans a branch away from its parent, so the line between them crosses no mark', () => {
+  it('settles wider than tall, as a window is', () => {
+    const { bounds } = layoutMap(crowded(), OPTIONS);
+    expect(bounds.x1 - bounds.x0).toBeGreaterThan(bounds.y1 - bounds.y0);
+  });
+
+  it('keeps the lines short: no project drifts away from the hub it hangs from', () => {
+    const { nodes } = layoutMap(crowded(), OPTIONS);
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    /* Fourteen marks round one hub take three rings; nothing should be a ring further out than that. */
+    const furthest = Math.max(28 + OPTIONS.labelRoom, OPTIONS.minClear) * 2 * 3.5;
+    for (const node of nodes) {
+      const parent = node.parentId ? byId.get(node.parentId) : undefined;
+      if (!parent || !['work', 'cars', 'boats'].includes(parent.id)) continue;
+      expect(distance(node, parent), `${node.id} is far from ${parent.id}`).toBeLessThan(furthest);
+    }
+  });
+
+  it('puts two branches of the root side by side rather than one above the other', () => {
+    const { nodes } = layoutMap(hub('root', [leaf('first'), leaf('second')]), DRAWN);
+    const first = nodes.find((n) => n.id === 'first')!;
+    const second = nodes.find((n) => n.id === 'second')!;
+    expect(first.x).toBeLessThan(0);
+    expect(second.x).toBeGreaterThan(0);
+    expect(Math.abs(first.y) + Math.abs(second.y)).toBeLessThan(1);
+  });
+
+  it('first draws a branch fanned away from its parent, so the line between them crosses no mark', () => {
     const trees = [
       hub('root', [hub('a', many('a', 2)), hub('b', many('b', 2))]),
       hub('root', [hub('a', many('a', 14)), hub('b', [hub('c', many('c', 11)), ...many('b', 3)]), leaf('d')]),
     ];
     for (const tree of trees) {
-      const { nodes } = layoutMap(tree, OPTIONS);
+      const { nodes } = layoutMap(tree, DRAWN);
       const byId = new Map(nodes.map((n) => [n.id, n]));
       for (const child of nodes) {
         const parent = child.parentId ? byId.get(child.parentId) : undefined;
