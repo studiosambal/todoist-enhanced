@@ -76,6 +76,8 @@ export interface Project {
   workspace_id?: string | null;
   /** Todoist folders are projects that hold others rather than tasks. */
   is_folder?: boolean;
+  /** The folder of a team workspace this project is filed under, if any. */
+  folder_id?: string | null;
   collapsed?: boolean;
 }
 
@@ -108,6 +110,34 @@ export interface Workspace {
   name: string;
   logo_big?: string | null;
 }
+
+/**
+ * A folder of a team workspace.
+ *
+ * Not a project: Todoist keeps folders as a resource of their own, and a
+ * project says which one it is filed under with `folder_id`. A folder holds
+ * projects and nothing else, and only exists inside a workspace.
+ */
+export interface Folder {
+  id: string;
+  name: string;
+  workspace_id: string;
+  child_order?: number;
+  default_order?: number;
+  is_deleted?: boolean;
+}
+
+/**
+ * The id a workspace folder goes by in the project tree.
+ *
+ * The tree is made of projects, and a folder is drawn as one that only holds
+ * others (`is_folder`). The prefix keeps its id apart from every real project
+ * id, so nothing that looks a project up by id can mistake one for the other,
+ * and no command is ever sent to Todoist naming a folder as a project.
+ */
+export const FOLDER_NODE_PREFIX = 'folder:';
+export const folderNodeId = (folderId: string): string => `${FOLDER_NODE_PREFIX}${folderId}`;
+export const isFolderNodeId = (id: string): boolean => id.startsWith(FOLDER_NODE_PREFIX);
 
 /** Who a project is shared with, and whether they have said yes. */
 export interface CollaboratorState {
@@ -219,6 +249,12 @@ export interface Snapshot {
   sections: Record<string, Section>;
   labels: Record<string, Label>;
   workspaces: Record<string, Workspace>;
+  /**
+   * The folders of the team workspaces. Absent in a snapshot saved by a build
+   * that did not read them, which is how the app knows to read the account
+   * whole once more (store/sync.ts).
+   */
+  folders?: Record<string, Folder>;
   collaborators: Record<string, Collaborator>;
   /** Absent in a snapshot saved before 2.0. */
   notifications?: Record<string, LiveNotification>;

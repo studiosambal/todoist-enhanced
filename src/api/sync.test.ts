@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveTempIds } from './sync';
+import { applySync, resolveTempIds, SYNC_RESOURCE_TYPES } from './sync';
 import { emptySnapshot, type Snapshot } from '@/domain/types';
 import { item } from '@/test/items';
 
@@ -42,5 +42,33 @@ describe('resolveTempIds', () => {
     const next = resolveTempIds(snapshot, { tmp: 'real' });
     expect(Object.keys(next.items)).toEqual(['real']);
     expect(next.items.real.content).toBe('from Todoist');
+  });
+});
+
+describe('applySync and the folders of a team workspace', () => {
+  const folder = (id: string, extra: object = {}) => ({ id, name: id, workspace_id: 'w1', ...extra });
+
+  it('asks Todoist for them', () => {
+    expect(SYNC_RESOURCE_TYPES).toContain('folders');
+  });
+
+  it('keeps what a full read returns, and an empty list when it returns none', () => {
+    const read = applySync(emptySnapshot(), {
+      sync_token: 't1', full_sync: true, folders: [folder('cars'), folder('boats')],
+    });
+    expect(Object.keys(read.folders ?? {}).sort()).toEqual(['boats', 'cars']);
+    expect(applySync(emptySnapshot(), { sync_token: 't1', full_sync: true }).folders).toEqual({});
+  });
+
+  it('merges a later change and drops a folder Todoist deleted', () => {
+    const first = applySync(emptySnapshot(), {
+      sync_token: 't1', full_sync: true, folders: [folder('cars'), folder('boats')],
+    });
+    const next = applySync(first, {
+      sync_token: 't2', full_sync: false,
+      folders: [folder('cars', { name: 'Autos' }), folder('boats', { is_deleted: true })],
+    });
+    expect(Object.keys(next.folders ?? {})).toEqual(['cars']);
+    expect(next.folders?.cars.name).toBe('Autos');
   });
 });

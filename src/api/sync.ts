@@ -1,6 +1,6 @@
 import { request } from './client';
 import type {
-  Collaborator, CollaboratorState, Item, Label, LiveNotification, Note, Project, Reminder,
+  Collaborator, CollaboratorState, Folder, Item, Label, LiveNotification, Note, Project, Reminder,
   Section, Snapshot, TodoistUser, Workspace,
 } from '@/domain/types';
 
@@ -8,7 +8,7 @@ import type {
 export const SYNC_RESOURCE_TYPES = [
   'items', 'projects', 'sections', 'labels', 'notes', 'project_notes',
   'reminders', 'user', 'collaborators', 'workspaces', 'live_notifications',
-  'collaborator_states',
+  'collaborator_states', 'folders',
 ] as const;
 
 export interface SyncResponse {
@@ -24,6 +24,7 @@ export interface SyncResponse {
   reminders?: Reminder[];
   collaborators?: Collaborator[];
   workspaces?: Workspace[];
+  folders?: Folder[];
   live_notifications?: LiveNotification[];
   collaborator_states?: CollaboratorState[];
   user?: TodoistUser;
@@ -103,6 +104,7 @@ export function applySync(snapshot: Snapshot, response: SyncResponse): Snapshot 
     reminders: mergeCollection(snapshot.reminders, response.reminders, full),
     collaborators: mergeCollection(snapshot.collaborators, response.collaborators, full),
     workspaces: mergeCollection(snapshot.workspaces, response.workspaces, full),
+    folders: mergeCollection(snapshot.folders ?? {}, response.folders, full),
     notifications: mergeCollection(snapshot.notifications ?? {}, response.live_notifications, full),
     collaboratorStates: mergeStates(snapshot.collaboratorStates ?? [], response.collaborator_states, full),
     user: response.user ?? snapshot.user,
