@@ -1,4 +1,4 @@
-import type { Item } from './types';
+import type { CompletedItem, Item } from './types';
 
 /**
  * Who a task is for, in a shared project.
@@ -54,4 +54,20 @@ export function mineOrUnassigned(
     const who = effectiveAssignee(item, byId);
     return who === null || who === userId;
   };
+}
+
+/**
+ * What was completed, without what was assigned to someone else.
+ *
+ * The history has no parents to read an assignee from, so only a task that
+ * names someone else is left out: on a team board a project then counts as
+ * moving when you, or nobody in particular, finished something in it — not
+ * because a colleague did.
+ */
+export function completedByMeOrNobody<T extends Pick<CompletedItem, 'responsible_uid'>>(
+  completed: T[],
+  userId: string | null | undefined,
+): T[] {
+  if (!userId) return completed;
+  return completed.filter((done) => !done.responsible_uid || done.responsible_uid === userId);
 }

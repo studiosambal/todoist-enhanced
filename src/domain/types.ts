@@ -240,6 +240,8 @@ export interface CompletedItem {
   duration?: TodoistDuration | null;
   priority?: TodoistPriority;
   note_count?: number;
+  /** Who the task was assigned to, when it was assigned to anyone. */
+  responsible_uid?: string | null;
 }
 
 /** Everything the app keeps about the account, kept in memory and mirrored to IndexedDB. */

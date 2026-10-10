@@ -11,6 +11,7 @@ import { useData } from '@/hooks/useData';
 import { navigate } from '@/hooks/useRoute';
 import { useT } from '@/hooks/useT';
 import { useToday } from '@/hooks/useToday';
+import { completedByMeOrNobody } from '@/domain/assignment';
 import { dueDate, formatRelativeDay, formatTimeAgo } from '@/domain/dates';
 import { formatDuration } from '@/domain/estimates';
 import { summariseLoad } from '@/domain/load';
@@ -106,6 +107,7 @@ export function MapView({ onOpen }: MapViewProps) {
   const workspaceOrder = useStore((s) => s.prefs.workspaceOrder);
   const focus = useStore((s) => s.prefs.mapFocus);
   const ongoing = useStore((s) => s.prefs.mapOngoing);
+  const hideOthers = useStore((s) => s.prefs.hideAssignedToOthers);
   const setPrefs = useStore((s) => s.setPrefs);
   const today = useToday();
 
@@ -127,10 +129,13 @@ export function MapView({ onOpen }: MapViewProps) {
     until: endOfDay(today),
   }), [today]);
   const history = useCompleted(range, true);
-  const completed = useMemo(
-    () => [...history.data, ...history.previous],
-    [history.data, history.previous],
-  );
+  /* With other people's tasks hidden, what they finished does not make a
+     project move either: the map is then about your work, like every list. */
+  const userId = snapshot.user?.id;
+  const completed = useMemo(() => {
+    const all = [...history.data, ...history.previous];
+    return hideOthers ? completedByMeOrNobody(all, userId) : all;
+  }, [history.data, history.previous, hideOthers, userId]);
 
   const map = useMemo(() => buildProjectMap({
     groups: projectTree(snapshot, workspaceOrder),

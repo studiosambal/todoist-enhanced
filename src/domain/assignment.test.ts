@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveAssignee, mineOrUnassigned } from './assignment';
+import { completedByMeOrNobody, effectiveAssignee, mineOrUnassigned } from './assignment';
 import { item } from '@/test/items';
 import type { Item } from './types';
 
@@ -61,5 +61,22 @@ describe('mineOrUnassigned', () => {
   it('keeps everything when nobody is signed in', () => {
     const theirs = item({ id: 'theirs', responsible_uid: 'ana' });
     expect(mineOrUnassigned([theirs], null, () => undefined)(theirs)).toBe(true);
+  });
+});
+
+describe('completedByMeOrNobody', () => {
+  const done = [
+    { id: 'mine', responsible_uid: ME },
+    { id: 'open', responsible_uid: null },
+    { id: 'older' },
+    { id: 'theirs', responsible_uid: 'ana' },
+  ];
+
+  it('leaves out what was assigned to someone else, and nothing more', () => {
+    expect(completedByMeOrNobody(done, ME).map((entry) => entry.id)).toEqual(['mine', 'open', 'older']);
+  });
+
+  it('keeps everything when nobody is signed in', () => {
+    expect(completedByMeOrNobody(done, null)).toBe(done);
   });
 });
