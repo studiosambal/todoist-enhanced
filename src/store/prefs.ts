@@ -329,6 +329,14 @@ export interface Preferences {
   sidebarSearch: boolean;
   /** The numbers beside each list. */
   sidebarCounts: boolean;
+  /**
+   * Leaves tasks assigned to someone else off every list (domain/assignment).
+   *
+   * Off by default: a shared project shows everything in it, as it does in
+   * Todoist. On a team board most of what is listed is not yours to do, and
+   * it still counted in your week and in your load.
+   */
+  hideAssignedToOthers: boolean;
   /** What a task row shows, for every list (domain/taskDetails). */
   taskFields: TaskFields;
   /** The order of the chips beneath a task's title. */
@@ -431,6 +439,7 @@ export const defaultPreferences = (locale: Locale): Preferences => ({
   sidebarNav: defaultSidebarNav(),
   sidebarSearch: true,
   sidebarCounts: true,
+  hideAssignedToOthers: false,
   taskFields: defaultTaskFields(),
   detailOrder: defaultDetailOrder(),
   taskChips: 'classic',
@@ -494,6 +503,7 @@ export function hydratePreferences(stored: unknown, locale: Locale): Preferences
     sidebarNav: readSidebarNav(s.sidebarNav),
     sidebarSearch: s.sidebarSearch !== false,
     sidebarCounts: s.sidebarCounts !== false,
+    hideAssignedToOthers: s.hideAssignedToOthers === true,
     taskFields: readTaskFields(s.taskFields),
     detailOrder: readDetailOrder(s.detailOrder),
     // A missing choice is the published text layout, for an old account as much as a new one.

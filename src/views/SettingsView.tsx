@@ -239,6 +239,9 @@ export function SettingsView() {
             <Row title={t('settings.searchSections')} hint={t('settings.searchSectionsHint')}>
               <Switch checked={prefs.includeSectionsInSearch} onChange={() => setPrefs({ includeSectionsInSearch: !prefs.includeSectionsInSearch })} label={t('settings.searchSections')} />
             </Row>
+            <Row title={t('settings.hideOthers')} hint={t('settings.hideOthersHint')}>
+              <Switch checked={prefs.hideAssignedToOthers} onChange={() => setPrefs({ hideAssignedToOthers: !prefs.hideAssignedToOthers })} label={t('settings.hideOthers')} />
+            </Row>
 
             {/* Read from the account, so it is stated rather than offered. */}
             <Row title={t('settings.weekStart')} hint={t('settings.weekStartHint')}>
