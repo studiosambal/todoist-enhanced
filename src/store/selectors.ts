@@ -1,6 +1,6 @@
 import {
-  toDisplayPriority,
-  type GroupKey, type Item, type Project, type Snapshot,
+  folderNodeId, toDisplayPriority,
+  type Folder, type GroupKey, type Item, type Project, type Snapshot,
   type SortKey, type ViewFilters,
 } from '@/domain/types';
 import { estimateOf, effectiveEstimate } from '@/domain/estimates';
@@ -508,10 +508,41 @@ export interface WorkspaceGroup {
 }
 
 /**
+ * A workspace folder, in the shape the tree is made of.
+ *
+ * A project that only holds others, which is what every reader of the tree
+ * already takes `is_folder` to mean. Its id is prefixed (`folderNodeId`), so
+ * it is never one of `snapshot.projects`.
+ */
+const folderAsProject = (folder: Folder): Project => ({
+  id: folderNodeId(folder.id),
+  name: folder.name,
+  color: 'grey',
+  parent_id: null,
+  child_order: folder.child_order ?? folder.default_order ?? 0,
+  is_archived: false,
+  is_deleted: false,
+  is_favorite: false,
+  workspace_id: folder.workspace_id,
+  is_folder: true,
+});
+
+/** The folder a project is filed under, when that folder is still there. */
+function folderOf(snapshot: Snapshot, project: Project): Folder | null {
+  if (!project.folder_id || !project.workspace_id) return null;
+  const folder = snapshot.folders?.[project.folder_id];
+  if (!folder || folder.is_deleted || folder.workspace_id !== project.workspace_id) return null;
+  return folder;
+}
+
+/**
  * The sidebar's project tree.
  *
  * Todoist nests projects inside folders and inside other projects, so the
  * sidebar is built as a tree rather than a flat list, grouped by workspace.
+ * A team workspace files its projects under folders of its own (`folder_id`):
+ * each is a node holding the projects filed under it, ahead of the workspace's
+ * loose projects, as Todoist lists them.
  */
 export function projectTree(snapshot: Snapshot, order: string[] = []): WorkspaceGroup[] {
   const visible = Object.values(snapshot.projects).filter(
@@ -521,6 +552,13 @@ export function projectTree(snapshot: Snapshot, order: string[] = []): Workspace
   const nodes = new Map<string, ProjectNode>(
     visible.map((project) => [project.id, { project, children: [] }]),
   );
+
+  /* Every folder that is still there, with or without projects in it: an
+     empty one is a place a project can still be filed, in Todoist. */
+  const folders = new Map<string, ProjectNode>();
+  for (const folder of Object.values(snapshot.folders ?? {})) {
+    if (!folder.is_deleted) folders.set(folder.id, { project: folderAsProject(folder), children: [] });
+  }
 
   /* Every space keeps its heading even with nothing in it yet, so its first
      project can be added from there (#13). */
@@ -537,6 +575,12 @@ export function projectTree(snapshot: Snapshot, order: string[] = []): Workspace
       parent.children.push(node);
       continue;
     }
+    const folder = folderOf(snapshot, project);
+    const holder = folder ? folders.get(folder.id) : undefined;
+    if (holder) {
+      holder.children.push(node);
+      continue;
+    }
     const key = project.workspace_id ?? 'personal';
     const bucket = groups.get(key);
     if (bucket) bucket.push(node);
@@ -546,12 +590,20 @@ export function projectTree(snapshot: Snapshot, order: string[] = []): Workspace
   const byOrder = (a: ProjectNode, b: ProjectNode) =>
     byChildOrder(a.project, b.project);
   for (const node of nodes.values()) node.children.sort(byOrder);
+  for (const node of folders.values()) node.children.sort(byOrder);
+
+  /* A workspace's folders, in their own order. Only for a workspace that is
+     listed: a folder left behind by one that is gone has nowhere to show. */
+  const foldersOf = (key: string): ProjectNode[] =>
+    [...folders.values()]
+      .filter((node) => node.project.workspace_id === key && groups.has(key))
+      .sort(byOrder);
 
   return [...groups.entries()]
     .map(([key, roots]) => ({
       workspaceId: key === 'personal' ? null : key,
       name: key === 'personal' ? null : (snapshot.workspaces[key]?.name ?? null),
-      roots: roots.sort(byOrder),
+      roots: [...(key === 'personal' ? [] : foldersOf(key)), ...roots.sort(byOrder)],
     }))
     /* The personal space leads, as in Todoist, until the person has put the
        groups in an order of their own. A group they have not placed yet goes
@@ -580,7 +632,8 @@ export function projectCounts(items: Item[]): Map<string, number> {
  * Siblings share a parent and a workspace, because `child_order` only means
  * anything inside one list. A project at the root of a workspace and a project
  * at the root of the personal space are not in the same list, however alike
- * their rows look.
+ * their rows look. Nor are two projects of one workspace filed under different
+ * folders: each folder is a list of its own.
  */
 export function siblingOrder(snapshot: Snapshot, projectId: string): string[] {
   const project = snapshot.projects[projectId];
@@ -591,7 +644,8 @@ export function siblingOrder(snapshot: Snapshot, projectId: string): string[] {
       !other.is_deleted &&
       !other.inbox_project &&
       (other.parent_id ?? null) === (project.parent_id ?? null) &&
-      (other.workspace_id ?? null) === (project.workspace_id ?? null))
+      (other.workspace_id ?? null) === (project.workspace_id ?? null) &&
+      (folderOf(snapshot, other)?.id ?? null) === (folderOf(snapshot, project)?.id ?? null))
     .sort(byChildOrder)
     .map((other) => other.id);
 }

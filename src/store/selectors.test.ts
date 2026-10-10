@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { datedRoots, groupItems, projectTree, pullQuick, sortItems } from './selectors';
-import { emptySnapshot, type Project, type Section, type Snapshot } from '@/domain/types';
+import { datedRoots, groupItems, projectTree, pullQuick, siblingOrder, sortItems } from './selectors';
+import { emptySnapshot, folderNodeId, type Project, type Section, type Snapshot } from '@/domain/types';
 import { due, item } from '@/test/items';
 
 const project = (id: string, child_order: number, extra: Partial<Project> = {}): Project => ({
@@ -231,5 +231,69 @@ describe('projectTree keeps empty spaces (#13)', () => {
   it('shows a workspace with no project, and the personal space with none', () => {
     const tree = projectTree({ ...emptySnapshot(), workspaces: { w1: { id: 'w1', name: 'Studio' } } });
     expect(tree.map((g) => [g.workspaceId, g.roots.length])).toEqual([[null, 0], ['w1', 0]]);
+  });
+});
+
+describe('projectTree files a team workspace under its folders', () => {
+  const team = (): Snapshot => ({
+    ...emptySnapshot(),
+    workspaces: { w1: { id: 'w1', name: 'Team' } },
+    folders: {
+      cars: { id: 'cars', name: 'Cars', workspace_id: 'w1', child_order: 2 },
+      boats: { id: 'boats', name: 'Boats', workspace_id: 'w1', child_order: 1 },
+      gone: { id: 'gone', name: 'Gone', workspace_id: 'w1', child_order: 3, is_deleted: true },
+    },
+    projects: {
+      mine: project('mine', 1),
+      seo: project('seo', 2, { workspace_id: 'w1', folder_id: 'cars' }),
+      reviews: project('reviews', 1, { workspace_id: 'w1', folder_id: 'cars' }),
+      hiswa: project('hiswa', 1, { workspace_id: 'w1', folder_id: 'boats' }),
+      loose: project('loose', 1, { workspace_id: 'w1' }),
+      orphan: project('orphan', 2, { workspace_id: 'w1', folder_id: 'gone' }),
+      nested: project('nested', 1, { workspace_id: 'w1', folder_id: 'cars', parent_id: 'seo' }),
+    },
+  });
+  const group = (snapshot: Snapshot, id: string | null) =>
+    projectTree(snapshot).find((g) => g.workspaceId === id)!;
+  const shape = (snapshot: Snapshot, id: string | null) =>
+    group(snapshot, id).roots.map((root) => [root.project.id, root.children.map((c) => c.project.id)]);
+
+  it('puts the folders first, in their order, each holding its projects in theirs', () => {
+    expect(shape(team(), 'w1')).toEqual([
+      [folderNodeId('boats'), ['hiswa']],
+      [folderNodeId('cars'), ['reviews', 'seo']],
+      ['loose', []],
+      ['orphan', []],
+    ]);
+  });
+
+  it('draws a folder as a project that only holds others, under an id no project has', () => {
+    const [boats] = group(team(), 'w1').roots;
+    expect(boats.project.is_folder).toBe(true);
+    expect(boats.project.name).toBe('Boats');
+    expect(team().projects[boats.project.id]).toBeUndefined();
+  });
+
+  it('keeps a project nested in another under that project, not beside it', () => {
+    const cars = group(team(), 'w1').roots[1];
+    expect(cars.children.find((c) => c.project.id === 'seo')!.children.map((c) => c.project.id))
+      .toEqual(['nested']);
+  });
+
+  it('leaves the personal space and a snapshot without folders as they were', () => {
+    expect(shape(team(), null)).toEqual([['mine', []]]);
+    const before = { ...team(), folders: undefined };
+    expect(shape(before, 'w1').map(([id]) => id).sort()).toEqual(['hiswa', 'loose', 'orphan', 'reviews', 'seo']);
+  });
+
+  it('keeps an empty folder, which is still a place to file a project', () => {
+    const snapshot = team();
+    delete snapshot.projects.hiswa;
+    expect(shape(snapshot, 'w1')[0]).toEqual([folderNodeId('boats'), []]);
+  });
+
+  it('counts as siblings only the projects of the same folder', () => {
+    expect(siblingOrder(team(), 'seo')).toEqual(['reviews', 'seo']);
+    expect(siblingOrder(team(), 'loose')).toEqual(['loose', 'orphan']);
   });
 });

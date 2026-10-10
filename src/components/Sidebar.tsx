@@ -11,7 +11,7 @@ import { markerStyle, avatarUrl } from '@/domain/colors';
 import { firstName, karmaStanding } from '@/domain/karma';
 import { readProjectIcon } from '@/domain/projectIcons';
 import { ProjectIcon } from './ProjectIconPicker';
-import type { ViewId } from '@/domain/types';
+import { isFolderNodeId, type ViewId } from '@/domain/types';
 import type { DropTarget } from '@/domain/dnd';
 import type { TranslationKey } from '@/i18n';
 import { SyncStatus } from './SyncStatus';
@@ -267,23 +267,28 @@ export function Sidebar({
 
     if (project.is_folder) {
       const isOpen = openFolders[project.id] ?? true;
+      const disclosure = (
+        <button
+          className="navitem folderitem"
+          data-tour="folder"
+          aria-expanded={isOpen}
+          onClick={() => setOpenFolders((prev) => ({ ...prev, [project.id]: !isOpen }))}
+        >
+          <Icon name="project" />
+          <span className="label">{project.name}</span>
+          <Icon name={isOpen ? 'caret-up' : 'caret'} size="sm" className="disclose" />
+        </button>
+      );
       return (
         <div key={`${keyPrefix}folder-${project.id}`}>
           {/* A folder takes a project dropped on it, which is the only thing a
               folder is for and was the one place in the sidebar you could not
-              drag a project into. */}
-          <ProjectDropRow projectId={project.id}>
-            <button
-              className="navitem folderitem"
-              data-tour="folder"
-              aria-expanded={isOpen}
-              onClick={() => setOpenFolders((prev) => ({ ...prev, [project.id]: !isOpen }))}
-            >
-              <Icon name="project" />
-              <span className="label">{project.name}</span>
-              <Icon name={isOpen ? 'caret-up' : 'caret'} size="sm" className="disclose" />
-            </button>
-          </ProjectDropRow>
+              drag a project into. Not a folder of a team workspace: filing a
+              project there is not a move under a parent project, which is the
+              only move a drop makes, so it is a heading and nothing lands on it. */}
+          {isFolderNodeId(project.id)
+            ? <div className="navrow">{disclosure}</div>
+            : <ProjectDropRow projectId={project.id}>{disclosure}</ProjectDropRow>}
           {isOpen && children.map((child) => projectNode(child, keyPrefix, depth + 1))}
         </div>
       );

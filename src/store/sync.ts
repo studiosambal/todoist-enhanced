@@ -185,7 +185,10 @@ export const createSyncSlice: Slice<SyncSlice> = (set, get) => ({
            and reads it before sending anything: only then is it known whose
            account this is, and so which of the queued changes are theirs. */
         if (signIn === 'signed-in') void get().refresh(true, { legacyOwner: snapshot.user?.id ?? null });
-        else void get().refresh(snapshot.syncToken === '*');
+        /* A copy saved before folders were read has none, and an incremental
+           read only brings what changed since: without one whole read the
+           folders of a team workspace would never arrive. */
+        else void get().refresh(snapshot.syncToken === '*' || snapshot.folders === undefined);
       }
     } catch (error) {
       set({ syncError: String(error) });
