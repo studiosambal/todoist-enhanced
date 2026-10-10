@@ -354,6 +354,8 @@ export type ViewId =
   | 'label'
   | 'labels'
   | 'matrix'
+  /** Every project as one mark: what is moving, what is stuck, what is nearly done. */
+  | 'map'
   | 'insights';
 
 export type DisplayMode = 'list' | 'board' | 'focus';

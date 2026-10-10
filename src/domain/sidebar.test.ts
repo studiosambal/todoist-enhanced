@@ -37,14 +37,22 @@ describe('readSidebarNav', () => {
     const nav = readSidebarNav({
       other: [{ id: 'review', on: true }, { id: 'dashboard', on: true }, { id: 'matrix', on: true }, { id: 'labels', on: true }],
     });
-    expect(ids(nav.other)).toEqual(['review', 'dashboard', 'logbook', 'matrix', 'labels']);
+    expect(ids(nav.other)).toEqual(['review', 'dashboard', 'logbook', 'matrix', 'labels', 'map']);
+  });
+
+  it('gives a list written before the project map its entry, after Tags wherever Tags was put', () => {
+    const nav = readSidebarNav({
+      other: [{ id: 'labels', on: true }, { id: 'review', on: true }, { id: 'dashboard', on: false }, { id: 'logbook', on: true }, { id: 'matrix', on: true }],
+    });
+    expect(ids(nav.other)).toEqual(['labels', 'map', 'review', 'dashboard', 'logbook', 'matrix']);
+    expect(nav.other.find((entry) => entry.id === 'map')?.on).toBe(true);
   });
 
   it('lists every entry exactly once, whatever it is given', () => {
     const nav = readSidebarNav({ main: [{ id: 'review' }], other: [{ id: 'inbox' }] });
     const all = ids([...nav.main, ...nav.other]);
     expect(new Set(all).size).toBe(all.length);
-    expect(all).toHaveLength(10);
+    expect(all).toHaveLength(11);
     // Moved across blocks: it stays where the user put it.
     expect(ids(nav.main)).toContain('review');
     expect(ids(nav.other)).toContain('inbox');
