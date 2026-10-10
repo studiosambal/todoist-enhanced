@@ -18,7 +18,7 @@ function parse(hash: string): Route {
   if (view === 'dashboard') return { view: 'insights' };
   const known: ViewId[] = [
     'inbox', 'week', 'today', 'upcoming', 'someday', 'review',
-    'settings', 'project', 'label', 'labels', 'matrix', 'insights',
+    'settings', 'project', 'label', 'labels', 'matrix', 'map', 'insights',
   ];
   if (!known.includes(view as ViewId)) return { view: 'week' };
   const sectionId = view === 'project' ? new URLSearchParams(query).get('section') ?? undefined : undefined;

@@ -5,7 +5,7 @@ import {
   CalendarDays, Check, ChevronDown, ChevronUp, Clock, Coffee, CornerDownRight,
   ExternalLink, Filter, Flag, Flame, Folder, GripVertical, Group, Inbox,
   Kanban, Layers, LayoutDashboard, Lightbulb, Link, List, LogOut, Mail, Menu,
-  MessageSquare, MoreHorizontal, PanelLeft, PanelTop, Pencil, Plus, Repeat,
+  MessageSquare, MoreHorizontal, Network, PanelLeft, PanelTop, Pencil, Plus, Repeat,
   Search, Settings, SlidersHorizontal, Star, Tag, Target, TrendingUp,
   TriangleAlert, Upload, X, ListChecks, Bold, Italic, Strikethrough, Heading1, Heading2, Quote, Code, ListOrdered,
   User, Eye, Sparkles, Info, Palette, Paperclip, SquareCheck, SmilePlus, Copy, Trash2, ArrowUp, FileText,
@@ -17,7 +17,7 @@ export type IconName =
   | 'arrow-left' | 'arrow-right' | 'bars' | 'bell' | 'board' | 'calendar'
   | 'caret' | 'caret-up' | 'check' | 'clock' | 'close' | 'coffee' | 'comment'
   | 'dashboard' | 'deadline' | 'drag' | 'edit' | 'export' | 'external'
-  | 'filter' | 'flag' | 'flame' | 'group' | 'inbox' | 'link' | 'list' | 'logout' | 'mail' | 'menu' | 'more'
+  | 'filter' | 'flag' | 'flame' | 'group' | 'inbox' | 'link' | 'list' | 'logout' | 'mail' | 'map' | 'menu' | 'more'
   | 'plus' | 'project' | 'repeat' | 'search' | 'settings' | 'sidebar'
   | 'section' | 'sliders' | 'someday' | 'sort' | 'stack' | 'star' | 'subtask'
   | 'tag' | 'tasks' | 'user' | 'eye' | 'sparkles' | 'info' | 'palette'
@@ -56,6 +56,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   inbox: Inbox,
   list: List,
   logout: LogOut,
+  map: Network,
   menu: Menu,
   more: MoreHorizontal,
   plus: Plus,

@@ -387,6 +387,19 @@ export interface Preferences {
   /** Narrows the matrix to one workspace's projects; null is every workspace. */
   eisenhowerWorkspace: string | null;
   /**
+   * The projects in focus on the project map (domain/projectMap), in the order
+   * they were chosen. A commitment rather than a view of the moment, so it
+   * travels with the account: the three you picked at your desk are still the
+   * three on your phone.
+   */
+  mapFocus: string[];
+  /**
+   * Projects marked by hand on the map as ongoing work (true) or as having an
+   * end after all (false), by project id. Anything not listed is read from
+   * the project itself.
+   */
+  mapOngoing: Record<string, boolean>;
+  /**
    * The account has been through the first run (walkthrough finished or
    * skipped). Kept with the settings so a second browser does not ask again;
    * the device also remembers it on its own (domain/onboarding.ts).
@@ -449,6 +462,8 @@ export const defaultPreferences = (locale: Locale): Preferences => ({
   eisenhowerShowFuture: false,
   eisenhowerIncludeSomeday: false,
   eisenhowerWorkspace: null,
+  mapFocus: [],
+  mapOngoing: {},
   onboarded: false,
   setupDone: false,
   workspaceOrder: [],
@@ -528,6 +543,12 @@ export function hydratePreferences(stored: unknown, locale: Locale): Preferences
     eisenhowerShowFuture: s.eisenhowerShowFuture === true,
     eisenhowerIncludeSomeday: s.eisenhowerIncludeSomeday === true,
     eisenhowerWorkspace: typeof s.eisenhowerWorkspace === 'string' ? s.eisenhowerWorkspace : null,
+    mapFocus: Array.isArray(s.mapFocus)
+      ? [...new Set(s.mapFocus.filter((id): id is string => typeof id === 'string'))]
+      : [],
+    mapOngoing: s.mapOngoing && typeof s.mapOngoing === 'object' && !Array.isArray(s.mapOngoing)
+      ? Object.fromEntries(Object.entries(s.mapOngoing).filter(([, value]) => typeof value === 'boolean'))
+      : {},
     showDustGroup: s.showDustGroup !== false,
     // Only the delays the Settings offers: anything else reads as the default.
     dustAfterMonths: isDustMonths(s.dustAfterMonths) ? s.dustAfterMonths : base.dustAfterMonths,

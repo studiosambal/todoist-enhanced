@@ -249,6 +249,7 @@ export function Sidebar({
       case 'upcoming': return navItem('upcoming', 'upcoming', 'nav.upcoming', counts.upcoming);
       case 'someday': return navItem('someday', 'someday', 'nav.someday', counts.someday, { kind: 'someday' });
       case 'review': return navItem('review', 'check', 'nav.review', 0);
+      case 'map': return navItem('map', 'map', 'nav.map', 0);
       case 'dashboard':
         return navItem('insights', 'trend', 'nav.dashboard', 0, undefined,
           { current: route.view === 'insights' && !insightsOnLogbook });

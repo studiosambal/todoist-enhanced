@@ -81,6 +81,8 @@ export function Search({ open, onClose, onOpen, seed = '' }: SearchProps) {
         run: go(() => navigate('someday')) },
       { key: 'go-review', icon: 'check', title: t('nav.review'),
         run: go(() => navigate('review')) },
+      { key: 'go-map', icon: 'map', title: t('nav.map'),
+        run: go(() => navigate('map')) },
       /* Always findable: opening it from here turns the page on, rather than
          hiding it from the one place you would look for it. */
       { key: 'go-matrix', icon: 'dashboard' as const, title: t('nav.matrix'),

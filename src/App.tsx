@@ -26,6 +26,7 @@ import { InsightsView } from './views/InsightsView';
 import { ReviewView } from './views/ReviewView';
 import { SettingsView } from './views/SettingsView';
 import { EisenhowerView } from './views/EisenhowerView';
+import { MapView } from './views/MapView';
 import { ConnectView } from './views/ConnectView';
 import { EstimateStorageDialog } from './components/overlays/EstimateStorageDialog';
 import { Walkthrough } from './components/overlays/Walkthrough';
@@ -810,6 +811,7 @@ function AppShell({
             <ProjectView projectId={route.id} revealSectionId={route.sectionId} {...viewProps} />
           )}
           {route.view === 'review' && <ReviewView onOpen={openTask} />}
+          {route.view === 'map' && <MapView onOpen={openTask} />}
           {route.view === 'insights' && <InsightsView onOpen={openTask} />}
           {route.view === 'settings' && <SettingsView />}
         </section>
