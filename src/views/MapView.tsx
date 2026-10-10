@@ -76,6 +76,9 @@ const LENS_TITLE: Record<MapLens, TranslationKey> = {
 const ROOT_RADIUS = 24;
 const HUB_RADIUS = 12;
 const LABEL_PX = 11.5;
+/** The room the layout keeps round each mark for its name (domain/mapLayout). */
+const LABEL_ROOM = 20;
+const MIN_CLEAR = 44;
 const MIN_SCALE = 0.12;
 const MAX_SCALE = 5;
 /** Further than this and a press was a drag, not a click. */
@@ -176,13 +179,21 @@ export function MapView({ onOpen }: MapViewProps) {
         children: childIds.map((id) => map.nodes.get(id)!).filter(visible).map(build),
       };
     };
-    return layoutMap(build(map.nodes.get(MAP_ROOT)!));
+    return layoutMap(build(map.nodes.get(MAP_ROOT)!), { labelRoom: LABEL_ROOM, minClear: MIN_CLEAR });
   }, [map, projects, sizeBy, scope, visible]);
 
   const placed = useMemo(
     () => new Map(layout.nodes.map((node) => [node.id, node])),
     [layout],
   );
+  /* Hubs are drawn last, so the name of a branch is never under one of its projects. */
+  const drawn = useMemo(() => {
+    const rank = (at: PlacedNode) => {
+      const node = map.nodes.get(at.id);
+      return !node ? 0 : node.kind === 'root' ? 2 : node.status === null ? 1 : 0;
+    };
+    return [...layout.nodes].sort((a, b) => rank(a) - rank(b));
+  }, [layout, map]);
   const shownTotal = useMemo(() => projects.reduce((sum, node) => sum + node.open, 0), [projects]);
   /* A hub's name goes on the side its projects are not: under a hub whose
      branch fans downwards, the name would sit among them. */
@@ -571,7 +582,7 @@ export function MapView({ onOpen }: MapViewProps) {
                   />
                 );
               })}
-              {layout.nodes.map((at) => {
+              {drawn.map((at) => {
                 const node = map.nodes.get(at.id);
                 return node ? (
                   <MapMark
@@ -668,8 +679,15 @@ function MapMark({
   const root = node.kind === 'root';
   const inside = root || (!hub && at.r >= 13 && value > 0);
   const size = LABEL_PX / scale;
-  const showLabel = hub || at.r * scale >= 5.2 || selected || focused || lit;
+  /* A name needs about this much of the screen to itself to be read beside
+     its neighbours'; zoomed further out than that, only the hubs keep theirs. */
+  const room = Math.max(at.r + LABEL_ROOM, MIN_CLEAR) * scale;
+  const showLabel = hub || room >= 22 || selected || focused || lit;
   const showCount = root || at.r * scale >= 8.5;
+  const counted = valueText(value);
+  /* As large as the mark allows, and never wider than it. */
+  const countSize = root ? 14
+    : Math.max(8, Math.min(at.r * 0.62, 19, (at.r * 1.7) / (Array.from(counted).length * 0.58)));
   const text = root ? label
     : hub ? `${trim(label, 22)} · ${node.totalOpen}`
     : `${trim(label, 18)}${!inside && value > 0 ? ` · ${valueText(value)}` : ''}`;
@@ -692,9 +710,7 @@ function MapMark({
       )}
       <circle className="mapmark-body" r={at.r} />
       {inside && showCount && (
-        <text className="mapmark-count" fontSize={root ? 14 : Math.max(9, Math.min(at.r * 0.62, 19))}>
-          {valueText(value)}
-        </text>
+        <text className="mapmark-count" fontSize={countSize}>{counted}</text>
       )}
       {showLabel && (
         <text
