@@ -915,6 +915,8 @@ export const fr: Record<TranslationKey, string> = {
   'settings.density.compact': 'Compact',
   'settings.naturalDates': 'Lire les dates dans le nom de la tâche',
   'settings.naturalDatesHint': 'Transforme « appeler Marc demain à 9h » en tâche datée. #projet, p1 et @tag s’appliquent toujours.',
+  'settings.hideOthers': 'Masquer les tâches assignées à d’autres',
+  'settings.hideOthersHint': 'Dans les projets partagés, laisse de côté les tâches assignées à quelqu’un d’autre, dans chaque liste, compteur et charge. Les vôtres et celles de personne restent, ainsi qu’une tâche d’un autre qui contient l’une des vôtres.',
   'settings.searchSections': 'Inclure les sections dans la recherche globale',
   'settings.searchSectionsHint': 'Affiche les sections Todoist avec leur projet parent dans la palette de recherche.',
   'settings.eisenhower': 'Matrice d’Eisenhower',

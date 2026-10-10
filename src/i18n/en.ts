@@ -913,6 +913,8 @@ export const en = {
   'settings.density.compact': 'Compact',
   'settings.naturalDates': 'Read dates from the task name',
   'settings.naturalDatesHint': 'Turns “call Marc tomorrow at 9h” into a dated task. #project, p1 and @tag always apply.',
+  'settings.hideOthers': 'Hide tasks assigned to others',
+  'settings.hideOthersHint': 'In shared projects, leaves out the tasks assigned to someone else, in every list, count and load. Yours and nobody’s stay, and so does a task of theirs that holds one of yours.',
   'settings.searchSections': 'Include sections in global search',
   'settings.searchSectionsHint': 'Shows Todoist sections with their parent project in the search palette.',
   'settings.eisenhower': 'Eisenhower Matrix',
