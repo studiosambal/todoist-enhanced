@@ -75,14 +75,31 @@ Het gaat telkens om een paar regels. De eigen bestanden
 
 ## Bouwen en hosten
 
-```sh
-PUBLIC_URL=https://jouw-domein.nl/ npm run build
-```
+De site draait op `https://taken.studiosambal.nl/` en wordt door FlyWP uit
+deze repository gebouwd, vanaf de tak `sambal`:
 
-Upload daarna de map `dist/` naar dat adres, over HTTPS. `PUBLIC_URL` is nodig
-voor "Continue with Todoist": Todoist stuurt je alleen terug naar het adres dat
-in `oauth/client.json` staat, en de build schrijft dat bestand voor het adres
-dat je opgeeft. Inloggen met een API-token werkt ook zonder.
+| Veld in FlyWP | Waarde |
+|---|---|
+| Runtime | Static |
+| Package manager | npm |
+| Build command | `npm run build:sambal` |
+| Web directory | `/dist` |
+| Branch | `sambal` |
+| Push to deploy | aan |
+
+Met "Push to deploy" aan komt elke push naar `sambal` vanzelf online.
+
+`npm run build:sambal` is de gewone build met het adres erbij
+(`PUBLIC_URL=https://taken.studiosambal.nl/`). Dat adres is nodig voor
+"Continue with Todoist": Todoist stuurt je alleen terug naar het adres dat in
+`oauth/client.json` staat, en de build schrijft dat bestand voor het adres dat
+je opgeeft. Verhuist de site, pas dan het adres in dat script aan. Inloggen
+met een API-token werkt ook zonder.
+
+De `.htaccess` in de build is voor Apache en OpenLiteSpeed. Draait de site op
+Nginx, dan wordt dat bestand niet gelezen: de app werkt, maar de
+beveiligingsheaders die erin staan (onder meer de Content-Security-Policy)
+gelden pas als je ze in de Nginx Config Editor van de site zet.
 
 ## Indienen bij de maker
 

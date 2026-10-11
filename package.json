@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:sambal": "PUBLIC_URL=https://taken.studiosambal.nl/ npm run build",
     "icons": "node scripts/make-icons.mjs",
     "package": "npm run build && node scripts/package.mjs",
     "preview": "vite preview",
