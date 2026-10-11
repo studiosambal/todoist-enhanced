@@ -1,5 +1,5 @@
 import { toApiDate, type DateFormat } from './dates';
-import { MONTH_WORDS } from './dateVocabulary';
+import { MONTH_WORDS, type DateLang } from './dateVocabulary';
 
 /**
  * Reading a date out of what somebody typed.
@@ -22,19 +22,31 @@ export interface DateReading {
   hasTime: boolean;
 }
 
-const WEEKDAYS: Record<'en' | 'fr', string[]> = {
+const WEEKDAYS: Record<DateLang, string[]> = {
   en: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
   fr: ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'],
+  nl: ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'],
 };
 
 /**
- * For each month, every word either language has for it, longest first so
+ * Dutch writes a part of the day onto the day itself: "morgenochtend",
+ * "vrijdagmiddag", "vanavond". The part is a time and the word in front of it
+ * is the day, so both readers have to see the one word whole.
+ */
+const NL_DAYPART = '(?:ochtend|middag|avond|nacht)';
+const NL_DAY_HEAD = '(?:van|morgen|overmorgen|(?:zon|maan|dins|woens|donder|vrij|zater)dag)';
+
+/**
+ * For each month, every word any of the languages has for it, longest first so
  * "juillet" is tried before "juil". Exact words and their abbreviations, never
  * a stem: reading a month from its first three letters made "14 juillet" June
  * and "2 maisons" the 2nd of May (#123).
  */
 const MONTH_ALTERNATIVES: string[] = Array.from({ length: 12 }, (_, month) =>
-  [...MONTH_WORDS.en[month].split('|'), ...MONTH_WORDS.fr[month].split('|')]
+  [...new Set([
+    ...MONTH_WORDS.en[month].split('|'), ...MONTH_WORDS.fr[month].split('|'),
+    ...MONTH_WORDS.nl[month].split('|'),
+  ])]
     .sort((a, b) => b.length - a.length)
     .join('|'));
 
@@ -76,7 +88,7 @@ export interface TimeReading {
   end: number;
 }
 
-/** A time of day appearing anywhere in the phrase: "at 14:00", "2pm", "à 9h30". */
+/** A time of day appearing anywhere in the phrase: "at 14:00", "2pm", "à 9h30", "om 9 uur". */
 export function readTime(text: string): TimeReading | null {
   const span = (match: RegExpMatchArray) => {
     /* The pattern may have eaten the space in front of the time, and that
@@ -86,13 +98,25 @@ export function readTime(text: string): TimeReading | null {
     return { start: match.index! + lead, end: match.index! + raw.length };
   };
 
-  const ampm = text.match(/\b(?:at|à|a)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  const ampm = text.match(/\b(?:at|à|a|om)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
   if (ampm) {
     let hours = Number(ampm[1]) % 12;
     if (ampm[3].toLowerCase() === 'pm') hours += 12;
     return { hours, minutes: Number(ampm[2] ?? 0), ...span(ampm) };
   }
-  const hm = text.match(/\b(?:at|à|a)?\s*(\d{1,2})\s*[h:]\s*(\d{2})?\b/i);
+  /* The Dutch clock, tried before the bare "9:30" so the word that follows the
+     figures goes with them: "om 9 uur", "9.30 uur", "9u30", and "om 10", which
+     is how the hour is said when nothing follows it. */
+  const dutch = text.match(/\b(?:om\s+)?(\d{1,2})(?:[:.](\d{2}))?\s*uur\b/i)
+    ?? text.match(/\b(?:om\s+)?(\d{1,2})\s*u\s*(\d{2})?\b/i)
+    ?? text.match(/\bom\s+(\d{1,2})\b(?!\s*[:.hu\d])/i);
+  if (dutch) {
+    const hours = Number(dutch[1]);
+    const minutes = Number(dutch[2] ?? 0);
+    if (hours > 23 || minutes > 59) return null;
+    return { hours, minutes, ...span(dutch) };
+  }
+  const hm = text.match(/\b(?:at|à|a|om)?\s*(\d{1,2})\s*[h:]\s*(\d{2})?\b/i);
   if (hm) {
     const hours = Number(hm[1]);
     if (hours > 23) return null;
@@ -113,6 +137,12 @@ export function readTime(text: string): TimeReading | null {
     [/\b(?:soir|soiree|evening|tonight)\b/i, 19],
     [/\b(?:midi|noon)\b/i, 12],
     [/\b(?:nuit|night)\b/i, 21],
+    /* Dutch, at the hours Todoist gives the same words. "morgen" on its own is
+       tomorrow and never the morning; "'s morgens" and "vanmorgen" are. */
+    [new RegExp(`\\b(?:${NL_DAY_HEAD}?ochtend|ochtends|morgens|vanmorgen)\\b`, 'i'), 9],
+    [new RegExp(`\\b(?:${NL_DAY_HEAD}?middag|middags)\\b`, 'i'), 12],
+    [new RegExp(`\\b(?:${NL_DAY_HEAD}?avond|avonds)\\b`, 'i'), 19],
+    [new RegExp(`\\b(?:${NL_DAY_HEAD}?nacht|nachts)\\b`, 'i'), 22],
   ];
   for (const [pattern, hours] of parts) {
     const match = text.match(pattern);
@@ -181,10 +211,10 @@ export function readNaturalDate(
     /* Today, said by naming a part of it. "ce soir" is the commonest way
        anybody writes tonight, and it names the hour at the same time — the
        time reader takes the same words a moment later. */
-    [/\b(ce soir|cette nuit|ce matin|cet? apres[- ]midi|this (?:morning|afternoon|evening)|tonight)\b/, 0],
-    [/\b(today|aujourd'?hui|auj)\b/, 0],
-    [/\b(tomorrow|demain)\b/, 1],
-    [/\b(after tomorrow|apres-demain|apres demain)\b/, 2],
+    [/\b(ce soir|cette nuit|ce matin|cet? apres[- ]midi|this (?:morning|afternoon|evening)|tonight|vanavond|vanmiddag|vanochtend|vanmorgen|vannacht)\b/, 0],
+    [/\b(today|aujourd'?hui|auj|vandaag)\b/, 0],
+    [new RegExp(`\\b(tomorrow|demain|morgen${NL_DAYPART}?)\\b`), 1],
+    [new RegExp(`\\b(after tomorrow|apres-demain|apres demain|overmorgen${NL_DAYPART}?)\\b`), 2],
   ];
   for (const [pattern, offset] of plain) {
     const match = text.match(pattern);
@@ -192,7 +222,7 @@ export function readNaturalDate(
   }
 
   // "next week" / "la semaine prochaine" — the coming Monday
-  const nextWeek = text.match(/\b(next week|semaine prochaine|la semaine prochaine)\b/);
+  const nextWeek = text.match(/\b(next week|semaine prochaine|la semaine prochaine|volgende week|komende week)\b/);
   if (nextWeek) {
     return found(addDays(today, ((8 - today.getDay()) % 7) || 7), nextWeek);
   }
@@ -204,20 +234,31 @@ export function readNaturalDate(
     const weeks = relative[2].startsWith('week') || relative[2].startsWith('semaine');
     return found(addDays(today, count * (weeks ? 7 : 1)), relative);
   }
+  /* "over 3 dagen" / "over 2 weken". Its own pattern, with Dutch units only:
+     "over 3 weeks" is English, and says how long something takes. */
+  const relativeNl = text.match(/\bover\s+(\d{1,3})\s*(dag|dagen|week|weken)\b/);
+  if (relativeNl) {
+    const count = Number(relativeNl[1]);
+    return found(addDays(today, count * (relativeNl[2].startsWith('we') ? 7 : 1)), relativeNl);
+  }
 
-  // A weekday name, in either language: the next one that is not today.
-  for (const names of Object.values(WEEKDAYS)) {
+  // A weekday name, in any of the languages: the next one that is not today.
+  for (const [lang, names] of Object.entries(WEEKDAYS)) {
+    /* Dutch may carry the part of the day on the end: "vrijdagmiddag". */
+    const tail = lang === 'nl' ? `${NL_DAYPART}?` : '';
     for (let index = 0; index < names.length; index += 1) {
       const name = fold(names[index]);
-      const match = text.match(new RegExp(`\\b(?:next |prochain |le )?${name}\\b`));
+      const match = text.match(new RegExp(
+        `\\b(?:next |prochain |le |volgende |komende |aanstaande )?${name}${tail}\\b`,
+      ));
       if (!match) continue;
       const delta = ((index - today.getDay() + 7) % 7) || 7;
       return found(addDays(today, delta), match);
     }
   }
 
-  /* "10 sept", "3 mars", "1er juillet", "July 1st", "sept 10": the next
-     occurrence of that calendar day. Both languages are read on purpose, and
+  /* "10 sept", "3 mars", "1er juillet", "July 1st", "sept 10", "3 mei": the next
+     occurrence of that calendar day. Every language is read on purpose, and
      each month is matched by its exact words with a boundary after them. When
      a sentence holds more than one, the one that starts first is the one read;
      the caller reads on from there for a later one. */

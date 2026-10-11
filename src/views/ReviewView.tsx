@@ -26,7 +26,7 @@ import {
   buildReview,
   type ReviewAction, type ReviewCadence, type ReviewStep,
 } from '@/domain/review';
-import type { TranslationKey } from '@/i18n';
+import { type TranslationKey, intlLocale } from '@/i18n';
 import { byChildOrder } from '@/domain/orderKey';
 import { plainTitle } from '@/domain/markdown';
 
@@ -262,7 +262,7 @@ export function ReviewView({ onOpen }: ReviewViewProps) {
               </button>
             </span>
             <span className="rangelabel">
-              {formatRange(weekRange, locale === 'fr' ? 'fr-FR' : 'en-GB')}
+              {formatRange(weekRange, intlLocale(locale))}
               {weekOffset === -1 && <small> · {t('review.lastWeek')}</small>}
               {weekOffset === 0 && <small> · {t('review.thisWeek')}</small>}
             </span>

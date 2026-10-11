@@ -206,8 +206,8 @@ untouched, because it never lived anywhere else.
 
 - **And the rest:** undo (`⌘Z`) for a move, a completion, a deletion or a drop,
   with a deleted task coming back with its subtasks. Offline, with changes
-  queued and sent when you reconnect, and installable as an app. English and
-  French, and settings for the things people disagree about.
+  queued and sent when you reconnect, and installable as an app. English,
+  French and Dutch, and settings for the things people disagree about.
 
 ## Screenshots
 

@@ -12,6 +12,7 @@ import {
 import { dateSuggestions, type DateSuggestion } from '@/domain/dateWords';
 import { readNaturalDate } from '@/domain/nlp';
 import { readRecurrence } from '@/domain/recurrence';
+import { intlLocale, type Locale } from '@/i18n';
 
 /** A quick choice under the typed field: a day, or one of the app's own places. */
 export interface DateShortcut {
@@ -428,8 +429,8 @@ export function DatePicker({
 }
 
 /** "Tue 29 Sep": the day a quick choice lands on, short enough for the end of its line. */
-export const shortDay = (day: Date, locale: 'en' | 'fr'): string =>
-  new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', {
+export const shortDay = (day: Date, locale: Locale): string =>
+  new Intl.DateTimeFormat(intlLocale(locale), {
     weekday: 'short', day: 'numeric', month: 'short',
   }).format(day).replace(/,/g, '');
 
@@ -455,7 +456,7 @@ export function parseTime(value: string): Date | null {
  * field says what it holds, so the time a task will get is never hidden.
  */
 export function dayAndTime(
-  value: string, locale: 'en' | 'fr', format: DateFormat, hour12: boolean,
+  value: string, locale: Locale, format: DateFormat, hour12: boolean,
 ): string {
   const day = parse(value);
   if (!day) return '';
@@ -468,7 +469,7 @@ export function dayAndTime(
 function readingText(
   reading: NonNullable<ReturnType<typeof readNaturalDate>>,
   withTime: boolean,
-  locale: 'en' | 'fr',
+  locale: Locale,
   format: DateFormat,
   hour12: boolean,
   dayOnly: string,
@@ -485,7 +486,7 @@ function readingText(
  */
 export function taskShortcuts(
   t: (key: 'date.today' | 'date.tomorrow' | 'date.nextWeek' | 'review.to.anytime' | 'review.to.someday') => string,
-  locale: 'en' | 'fr',
+  locale: Locale,
   go: {
     day: (date: Date, label: string) => void;
     today: () => void;

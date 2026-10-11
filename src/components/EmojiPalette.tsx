@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import { createPortal } from 'react-dom';
 import { Icon } from './Icon';
 import { useT } from '@/hooks/useT';
+import { type Locale } from '@/i18n';
 
 /**
  * Every emoji, to react to a comment with (#27).
@@ -43,11 +44,14 @@ export function reactionKey(unicode: string): string {
 
 let loading: Promise<Data> | null = null;
 
-function loadData(locale: 'en' | 'fr'): Promise<Data> {
+function loadData(locale: Locale): Promise<Data> {
   loading ??= Promise.all([
     import('emojibase-data/en/compact.json'),
-    import('emojibase-data/fr/compact.json'),
-    import(locale === 'fr' ? 'emojibase-data/fr/messages.json' : 'emojibase-data/en/messages.json'),
+    /* The other language's names, so an emoji is found by either. English is
+       always there; French when the interface is not Dutch, Dutch when it is. */
+    locale === 'nl' ? import('emojibase-data/nl/compact.json') : import('emojibase-data/fr/compact.json'),
+    locale === 'nl' ? import('emojibase-data/nl/messages.json')
+      : import(locale === 'fr' ? 'emojibase-data/fr/messages.json' : 'emojibase-data/en/messages.json'),
   ]).then(([en, fr, messages]) => {
     const french = new Map<string, { label: string; tags?: string[] }>();
     for (const entry of fr.default as Array<{ hexcode: string; label: string; tags?: string[] }>) {
@@ -59,7 +63,7 @@ function loadData(locale: 'en' | 'fr'): Promise<Data> {
       const other = french.get(entry.hexcode);
       emojis.push({
         unicode: reactionKey(entry.unicode),
-        label: locale === 'fr' && other ? other.label : entry.label,
+        label: locale !== 'en' && other ? other.label : entry.label,
         tags: [entry.label, ...(entry.tags ?? []), ...(other ? [other.label, ...(other.tags ?? [])] : [])].map(fold),
         group: entry.group,
         order: entry.order ?? 0,
