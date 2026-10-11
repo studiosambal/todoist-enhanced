@@ -1,7 +1,7 @@
 # Studio Sambal-versie van Enhanced for Todoist
 
 Dit is een fork van [julesvbertolino/todoist-enhanced](https://github.com/julesvbertolino/todoist-enhanced)
-met drie eigen extra's erbovenop. De originele app blijft de basis; de extra's
+met vier eigen extra's erbovenop. De originele app blijft de basis; de extra's
 staan zo veel mogelijk in eigen bestanden, zodat updates van het origineel
 binnen te halen blijven.
 
@@ -12,13 +12,15 @@ binnen te halen blijven.
 | `main` | Gelijk aan het origineel. Hier komt niets eigens in. |
 | `extra/projectenkaart` | De projectenkaart, vanaf `main`. |
 | `extra/teammappen` | Mappen van een teamwerkruimte in de zijbalk, vanaf `main`. |
-| `extra/mijn-taken` | Instelling "Hide tasks assigned to others", vanaf `main`. |
-| `sambal` | De drie extra's samen. Dit is de versie die je draait. |
+| `extra/mijn-taken` | Instelling "Taken van anderen verbergen", vanaf `main`. |
+| `extra/nederlands` | Nederlands als derde taal, en Nederlandse datum-invoer, vanaf `main`. |
+| `sambal` | De vier extra's samen. Dit is de versie die je draait. |
 
-Elke `extra/`-tak staat los van de andere twee en is zo als pull request bij
-de maker in te dienen. Op `sambal` staat daarnaast één koppeling die twee
-extra's nodig heeft: met "Hide tasks assigned to others" aan telt de kaart ook
-afgeronde taken van collega's niet mee.
+Elke `extra/`-tak staat los van de andere en is zo als pull request bij
+de maker in te dienen. Op `sambal` staat daarnaast wat twee extra's tegelijk
+nodig heeft: met "Taken van anderen verbergen" aan telt de kaart ook
+afgeronde taken van collega's niet mee, en de teksten van de kaart en van die
+instelling staan er ook in het Nederlands (in `src/i18n/nl.ts`).
 
 ## De extra's
 
@@ -35,9 +37,22 @@ origineel las ze niet, dus een werkruimte met mappen was één platte lijst. Nu
 staan de projecten onder hun map. Alleen lezen: een project naar een andere
 map slepen kan hier nog niet.
 
-**Taken van anderen verbergen.** Instellingen → General. Laat in elke lijst,
+**Taken van anderen verbergen.** Instellingen → Algemeen. Laat in elke lijst,
 teller en belasting de taken weg die aan iemand anders zijn toegewezen. Taken
 van jou of van niemand blijven staan.
+
+**Nederlands.** Instellingen → Algemeen → Taal, of op het inlogscherm. De hele
+interface is vertaald (`src/i18n/nl.ts`), en wat je typt wordt in het
+Nederlands gelezen: *morgen om 14:00*, *overmorgen*, *volgende week*, *over 3
+dagen*, *vrijdagmiddag*, *3 mei*, en herhalingen als *elke maandag*, *elke 3
+dagen*, *elke werkdag om 9 uur*, *om de week*, *elke 1e vrijdag*, *elke! 5
+dagen*. Een herhaling gaat in het Nederlands naar Todoist, in de woorden die
+Todoist zelf documenteert; wat je anders schrijft (*iedere*, *wo*, *tweede*,
+*'s ochtends*) wordt daarnaar omgezet. De release-notities ("Wat is er nieuw")
+blijven Engels: die schrijft de maker.
+
+Komt er in het origineel een nieuwe tekst bij, dan faalt `npm run typecheck`
+op `nl.ts` tot die tekst ook daar staat. Dat is de bedoeling.
 
 ## Het origineel bijwerken
 
@@ -49,8 +64,10 @@ git checkout main && git merge --ff-only upstream/main && git push origin main
 git checkout extra/projectenkaart && git merge main
 git checkout extra/teammappen     && git merge main
 git checkout extra/mijn-taken     && git merge main
+git checkout extra/nederlands     && git merge main
 git checkout sambal
 git merge extra/teammappen && git merge extra/mijn-taken && git merge extra/projectenkaart
+git merge extra/nederlands
 
 npm ci && npm run typecheck && npm run lint && npm test && npm run build
 ```

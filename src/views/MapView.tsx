@@ -29,7 +29,7 @@ import { displayTaskContent, type Item } from '@/domain/types';
 import { bucketOf } from '@/domain/views';
 import { projectTree } from '@/store/selectors';
 import { useStore } from '@/store/store';
-import type { TranslationKey } from '@/i18n';
+import type { Locale, TranslationKey } from '@/i18n';
 
 /* ------------------------------------------------------------------ */
 /* What this window is looking at: a matter of the moment, kept on the */
@@ -823,7 +823,7 @@ function MapMark({
 interface MapDetailProps {
   node: MapNode;
   path: string;
-  locale: 'en' | 'fr';
+  locale: Locale;
   inFocus: boolean;
   ongoing: boolean;
   notice: string | null;
