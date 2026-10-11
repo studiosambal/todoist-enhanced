@@ -49,20 +49,54 @@ test('focus holds three projects and refuses a fourth', async ({ demo: page }) =
   await expect(panel.getByRole('heading', { name: 'Focus · 2 of 3' })).toBeVisible();
 });
 
-test('the scope and the branch chips decide what is drawn', async ({ demo: page }) => {
+test('the page keeps its controls in the Display menu', async ({ demo: page }) => {
   await go(page, '#/map');
-  const scope = page.getByRole('group', { name: 'Which projects' });
+  // Nothing but the title line sits above the map.
+  await expect(page.getByRole('dialog', { name: 'Display' })).toHaveCount(0);
+  await expect(page.locator('.maplegend')).toHaveCount(0);
+  await page.locator('.pactions').getByRole('button', { name: 'Display' }).click();
+  const menu = page.getByRole('dialog', { name: 'Display' });
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+});
+
+test('the workspace and the parts chosen in Display decide what is drawn', async ({ demo: page }) => {
+  await go(page, '#/map');
+  const display = page.locator('.pactions').getByRole('button', { name: 'Display' });
+  await display.click();
+  const menu = page.getByRole('dialog', { name: 'Display' });
+  const scope = menu.getByRole('group', { name: 'Workspaces' });
   await scope.getByRole('button', { name: 'My projects' }).click();
   await expect(mark(page, 'home')).toBeVisible();
   await expect(mark(page, 'site')).toHaveCount(0);
   // The centre counts what is on the map, not the account.
   await expect(mark(page, 'root').locator('.mapmark-count')).toHaveText('18');
+  // The button says something is no longer as the page starts out.
+  await expect(display.locator('.displaycount')).toHaveText('1');
 
-  await scope.getByRole('button', { name: 'Everything' }).click();
-  await page.getByRole('group', { name: 'Show or hide parts of the map' })
+  await scope.getByRole('button', { name: 'Any' }).click();
+  await menu.getByRole('group', { name: 'Parts of the map' })
     .getByRole('button', { name: /Client work/ }).click();
   await expect(mark(page, 'client-a')).toHaveCount(0);
+  await expect(mark(page, 'clients')).toHaveCount(0);
   await expect(mark(page, 'site')).toBeVisible();
+
+  await menu.getByRole('button', { name: 'Reset all' }).click();
+  await expect(mark(page, 'client-a')).toBeVisible();
+  await expect(display.locator('.displaycount')).toHaveCount(0);
+});
+
+test('a status switched off in Display leaves the map', async ({ demo: page }) => {
+  await go(page, '#/map');
+  await page.locator('.pactions').getByRole('button', { name: 'Display' }).click();
+  const menu = page.getByRole('dialog', { name: 'Display' });
+  await menu.getByRole('group', { name: 'Statuses' }).getByRole('button', { name: /Moving/ }).click();
+  await expect(mark(page, 'site')).toHaveCount(0);
+  await expect(mark(page, 'root')).toBeVisible();
+
+  await menu.getByRole('switch', { name: 'Legend under the map' }).click();
+  await expect(page.locator('.maplegend')).toBeVisible();
 });
 
 test('a tile lights its projects on the map and lists them', async ({ demo: page }) => {

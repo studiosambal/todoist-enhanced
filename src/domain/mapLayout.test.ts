@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  arcPath, bubbleRadius, fitTransform, layoutMap, type LayoutNode, type PlacedNode,
+  arcPath, bubbleRadius, fitTransform, layoutMap, pickLabels,
+  type LabelMark, type LayoutNode, type PlacedNode,
 } from './mapLayout';
 
 const leaf = (id: string, r = 10): LayoutNode => ({ id, r, children: [] });
@@ -165,5 +166,45 @@ describe('arcPath', () => {
     expect(arcPath(10, 14, 0)).toBe('');
     expect(arcPath(10, 14, 1)).toContain('A 14 14 0 1 1');
     expect(arcPath(10, 14, 0.25)).toContain('A 14 14 0 0 1 14.00 -0.00');
+  });
+});
+
+describe('pickLabels', () => {
+  /** A mark with its name in a box right under it. */
+  const at = (id: string, x: number, y: number, extra: Partial<LabelMark> = {}): LabelMark => ({
+    id, x, y, r: 10, weight: 10,
+    box: { x0: x - 40, y0: y + 12, x1: x + 40, y1: y + 26 },
+    ...extra,
+  });
+
+  it('names every mark when the names have room', () => {
+    const named = pickLabels([at('a', 0, 0), at('b', 200, 0), at('c', 0, 100)]);
+    expect([...named].sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('gives the name to the heavier of two marks whose names would run together', () => {
+    const named = pickLabels([at('small', 0, 0, { weight: 5 }), at('large', 50, 0, { weight: 30 })]);
+    expect([...named]).toEqual(['large']);
+  });
+
+  it('writes no name over another project', () => {
+    // The name of `above` would fall on the mark right under it.
+    const named = pickLabels([at('above', 0, 0, { weight: 30 }), at('below', 0, 22, { weight: 5 })]);
+    expect(named.has('above')).toBe(false);
+    expect(named.has('below')).toBe(true);
+  });
+
+  it('always names a hub and the mark being asked about, and keeps the others off them', () => {
+    const named = pickLabels([
+      at('heavy', 0, 0, { weight: 99 }),
+      at('asked', 30, 0, { weight: 1, always: true }),
+    ]);
+    expect([...named]).toEqual(['asked']);
+  });
+
+  it('settles a tie by the order the marks are given in, the same way every time', () => {
+    const marks = [at('a', 0, 0), at('b', 50, 0), at('c', 100, 0, { weight: 20 }), at('d', 150, 0)];
+    expect([...pickLabels(marks)].sort()).toEqual(['a', 'c']);
+    expect([...pickLabels(marks)].sort()).toEqual(['a', 'c']);
   });
 });
