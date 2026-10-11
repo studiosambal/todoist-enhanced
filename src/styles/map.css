@@ -13,22 +13,20 @@
   --map-neutral:var(--faint);
 }
 
-/* ---------- The controls above the map ---------- */
-.mapbar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2) var(--s3);margin:var(--s4) 0 var(--s3)}
-.mapbar .segmented{flex:0 0 auto;max-width:100%}
-.mapbar .segmented button{padding:0 12px;white-space:nowrap}
-.mapbranches{flex:1 1 300px;min-width:0}
-.mapbranches .chip small{font-weight:500;color:var(--faint);font-variant-numeric:tabular-nums}
-/* Every branch starts on the map, and a row of accent chips would say the
-   opposite of "nothing has been filtered": on is plain, off is struck out. */
-.mapbranches .chip[aria-pressed="true"]{border-color:var(--border-strong);background:var(--subtle);color:var(--text)}
-.mapbranches .chip[aria-pressed="false"]{border-style:dashed;color:var(--faint);text-decoration:line-through}
+/* ---------- The Display menu (components/MapDisplayMenu) ---------- */
+.mapdisplay .chip small{font-weight:500;opacity:.7;font-variant-numeric:tabular-nums}
+.mapdisplay .chip .mapsw{background-clip:padding-box}
+.mapdisplay .chip[aria-pressed="false"] .mapsw{opacity:.55}
+/* A long folder name is cut inside its chip, not allowed to widen the panel. */
+.mapdisplay-name{max-width:190px;overflow:hidden;text-overflow:ellipsis}
+/* The parts are what this menu is opened for most: room for a good few rows. */
+.mapdisplay .chiprow.scroll{max-height:176px}
 
 /* ---------- The map and the column beside it ---------- */
-.mapstage{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:var(--s5);align-items:start}
+.mapstage{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:var(--s5);align-items:start;margin-top:var(--s4)}
 .mapcanvas{position:relative;min-width:0;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:var(--surface)}
 .mapcanvas svg{
-  display:block;width:100%;height:clamp(420px,calc(100dvh - 320px),900px);
+  display:block;width:100%;height:clamp(420px,calc(100dvh - 250px),900px);
   touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;
 }
 .mapcanvas svg:active{cursor:grabbing}

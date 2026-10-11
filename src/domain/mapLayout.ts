@@ -418,3 +418,53 @@ export function arcPath(inner: number, outer: number, share: number): string {
     'Z',
   ].join(' ');
 }
+
+/** A mark as it is on the screen, with the place its name would take. */
+export interface LabelMark {
+  id: string;
+  /** The centre and radius of the mark, in screen pixels. */
+  x: number;
+  y: number;
+  r: number;
+  /** The box the name would fill, in the same pixels. */
+  box: { x0: number; y0: number; x1: number; y1: number };
+  /** Named whatever it covers: a hub, or the mark being asked about. */
+  always?: boolean;
+  /** Among the rest, the heavier mark is named first. */
+  weight: number;
+}
+
+/**
+ * Which marks get their name written out.
+ *
+ * A name that runs over another name, or over another project, tells the eye
+ * less than no name at all: every mark still says what it is on hover and in
+ * the list beside the map, and zooming in pulls the marks apart until their
+ * names fit. So the names are handed out heaviest first, and a name only
+ * lands where it covers nothing already drawn.
+ */
+export function pickLabels(marks: LabelMark[], gap = 3): Set<string> {
+  const named = new Set<string>();
+  const taken: Array<LabelMark['box']> = [];
+  const overlaps = (a: LabelMark['box'], b: LabelMark['box']) =>
+    a.x0 < b.x1 + gap && b.x0 < a.x1 + gap && a.y0 < b.y1 + gap && b.y0 < a.y1 + gap;
+  const covers = (box: LabelMark['box'], mark: LabelMark) => {
+    const dx = mark.x - Math.max(box.x0, Math.min(mark.x, box.x1));
+    const dy = mark.y - Math.max(box.y0, Math.min(mark.y, box.y1));
+    return dx * dx + dy * dy < mark.r * mark.r;
+  };
+  const order = marks
+    .map((mark, index) => ({ mark, index }))
+    .sort((a, b) => Number(b.mark.always ?? false) - Number(a.mark.always ?? false)
+      || b.mark.weight - a.mark.weight || a.index - b.index);
+
+  for (const { mark } of order) {
+    if (!mark.always) {
+      if (taken.some((box) => overlaps(mark.box, box))) continue;
+      if (marks.some((other) => other.id !== mark.id && covers(mark.box, other))) continue;
+    }
+    named.add(mark.id);
+    taken.push(mark.box);
+  }
+  return named;
+}

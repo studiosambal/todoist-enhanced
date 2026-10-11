@@ -5,6 +5,7 @@ import {
 import { addDays, endOfDay, startOfDay } from 'date-fns';
 import '@/styles/map.css';
 import { Icon } from '@/components/Icon';
+import { MapDisplayMenu, type MapSizeBy } from '@/components/MapDisplayMenu';
 import { PageHeader } from '@/components/PageHeader';
 import { useCompleted } from '@/hooks/useCompleted';
 import { useData } from '@/hooks/useData';
@@ -16,7 +17,7 @@ import { formatDuration } from '@/domain/estimates';
 import { summariseLoad } from '@/domain/load';
 import { plainTitle } from '@/domain/markdown';
 import {
-  arcPath, bubbleRadius, fitTransform, layoutMap, type LayoutNode, type PlacedNode,
+  arcPath, bubbleRadius, fitTransform, layoutMap, pickLabels, type LabelMark, type LayoutNode, type PlacedNode,
 } from '@/domain/mapLayout';
 import {
   buildProjectMap, FOCUS_LIMIT, HISTORY_DAYS, isOngoing, lensProjects, MAP_ROOT, MAP_STATUSES,
@@ -35,16 +36,20 @@ import type { TranslationKey } from '@/i18n';
 /* with the account's settings instead (store/prefs).                  */
 /* ------------------------------------------------------------------ */
 
-type SizeBy = 'tasks' | 'time';
+type SizeBy = MapSizeBy;
 interface Looking {
   /** `all`, `personal`, or the id of a workspace. */
   scope: string;
   /** The branches taken off the map. */
   hidden: string[];
+  /** The statuses taken off the map. */
+  statuses: MapStatus[];
   size: SizeBy;
+  /** The line under the map that says what each mark stands for. */
+  legend: boolean;
 }
 const LOOKING_KEY = 'tde.map';
-const defaultLooking = (): Looking => ({ scope: 'all', hidden: [], size: 'tasks' });
+const defaultLooking = (): Looking => ({ scope: 'all', hidden: [], statuses: [], size: 'tasks', legend: false });
 
 function readLooking(): Looking {
   try {
@@ -53,7 +58,10 @@ function readLooking(): Looking {
     return {
       scope: typeof stored.scope === 'string' ? stored.scope : 'all',
       hidden: Array.isArray(stored.hidden) ? stored.hidden.filter((id) => typeof id === 'string') : [],
+      statuses: Array.isArray(stored.statuses)
+        ? MAP_STATUSES.filter((status) => (stored.statuses as unknown[]).includes(status)) : [],
       size: stored.size === 'time' ? 'time' : 'tasks',
+      legend: stored.legend === true,
     };
   } catch {
     return defaultLooking();
@@ -90,6 +98,11 @@ const branchKey = (map: ProjectMap, node: MapNode): string | null => {
   if (!top) return null;
   return top.kind === 'project' && top.childIds.length === 0 ? `loose:${top.space}` : top.id;
 };
+
+/** How far under a mark its name starts: clear of the focus ring and the arc of progress. */
+const labelOffset = (node: MapNode, focused: boolean): number => (focused ? 12 : node.finishable ? 7.5 : 2);
+/** How far the arc of progress reaches beyond the mark. */
+const ARC_REACH = 6.5;
 
 const trim = (text: string, length: number): string => {
   const letters = Array.from(text);
@@ -141,13 +154,35 @@ export function MapView({ onOpen }: MapViewProps) {
   const scope = looking.scope !== 'all' && map.spaces.some((space) => space.id === looking.scope)
     ? looking.scope : 'all';
 
-  const visible = useCallback((node: MapNode): boolean => {
-    if (node.kind === 'root') return true;
+  /** In the space being looked at, and not in a part taken off the map. */
+  const inScope = useCallback((node: MapNode): boolean => {
     if (scope !== 'all' && node.space !== scope) return false;
-    if (node.kind === 'space') return scope === 'all';
     const key = branchKey(map, node);
     return key === null || !looking.hidden.includes(key);
   }, [map, scope, looking.hidden]);
+
+  /* What is drawn. A project whose status is switched off stays while one
+     under it is still shown, or that one would hang from nothing; a folder
+     or a space left with nothing to show goes with what it held. */
+  const shown = useMemo(() => {
+    const kept = new Set<string>([MAP_ROOT]);
+    const off = new Set<MapStatus>(looking.statuses);
+    const walk = (node: MapNode): boolean => {
+      let below = false;
+      for (const id of node.childIds) if (walk(map.nodes.get(id)!)) below = true;
+      if (node.kind === 'root') return true;
+      const keep = inScope(node) && (
+        node.kind === 'space' ? scope === 'all' && (below || node.childIds.length === 0)
+          : node.status === null ? below || node.childIds.length === 0
+          : below || !off.has(node.status)
+      );
+      if (keep) kept.add(node.id);
+      return keep;
+    };
+    walk(map.nodes.get(MAP_ROOT)!);
+    return kept;
+  }, [map, scope, inScope, looking.statuses]);
+  const visible = useCallback((node: MapNode): boolean => shown.has(node.id), [shown]);
 
   const projects = useMemo(
     () => [...map.nodes.values()].filter((node) => node.status !== null && visible(node)),
@@ -195,6 +230,18 @@ export function MapView({ onOpen }: MapViewProps) {
     return [...layout.nodes].sort((a, b) => rank(a) - rank(b));
   }, [layout, map]);
   const shownTotal = useMemo(() => projects.reduce((sum, node) => sum + node.open, 0), [projects]);
+  /* A hub counts what is drawn under it, like the centre does. */
+  const hubTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    const sum = (node: MapNode): number => {
+      let total = node.status !== null && visible(node) ? node.open : 0;
+      for (const id of node.childIds) total += sum(map.nodes.get(id)!);
+      totals.set(node.id, total);
+      return total;
+    };
+    sum(map.nodes.get(MAP_ROOT)!);
+    return totals;
+  }, [map, visible]);
   /* A hub's name goes on the side its projects are not: under a hub whose
      branch fans downwards, the name would sit among them. */
   const nameAbove = useMemo(() => {
@@ -324,6 +371,11 @@ export function MapView({ onOpen }: MapViewProps) {
     ...was,
     hidden: was.hidden.includes(key) ? was.hidden.filter((other) => other !== key) : [...was.hidden, key],
   }));
+  const flipStatus = (status: MapStatus) => setLooking((was) => ({
+    ...was,
+    statuses: was.statuses.includes(status)
+      ? was.statuses.filter((other) => other !== status) : [...was.statuses, status],
+  }));
 
   const inLens = useMemo(() => {
     if (!lens || lens === 'all') return null;
@@ -353,6 +405,51 @@ export function MapView({ onOpen }: MapViewProps) {
     return names.join(' › ');
   };
 
+  /* What each mark has written in it and under it. */
+  const marks = drawn.flatMap((at) => {
+    const node = map.nodes.get(at.id);
+    if (!node) return [];
+    const hub = node.status === null;
+    const root = node.kind === 'root';
+    const label = nameOf(node);
+    const total = root ? shownTotal : hubTotals.get(at.id) ?? node.totalOpen;
+    const value = root ? shownTotal : sizeBy === 'time' ? node.minutes : node.open;
+    const counted = sizeBy === 'time' && !root ? formatDuration(value, locale) : String(value);
+    const inside = root || (!hub && at.r >= 13 && value > 0);
+    const text = root ? label
+      : hub ? `${trim(label, 22)} · ${total}`
+      : `${trim(label, 18)}${!inside && value > 0 ? ` · ${counted}` : ''}`;
+    return [{
+      at, node, hub, root, label, total, counted, inside, text,
+      focused: inFocus.has(at.id),
+      above: nameAbove.has(at.id) && hub,
+      lit: inLens !== null && inLens.has(at.id),
+    }];
+  });
+
+  /* Names are a constant size on the screen, so which of them fit depends on
+     the zoom and on nothing else about the view: dragging the map moves them
+     all together. */
+  const named = pickLabels(marks.map((mark): LabelMark => {
+    const { at, node } = mark;
+    const k = view.k;
+    const width = Array.from(mark.text).length * LABEL_PX * (mark.hub ? 0.6 : 0.56);
+    const baseline = mark.above
+      ? (at.y - at.r) * k - 6
+      : (at.y + at.r + labelOffset(node, mark.focused)) * k + LABEL_PX + 2;
+    return {
+      id: at.id,
+      x: at.x * k, y: at.y * k,
+      r: (at.r + (node.finishable && node.progress > 0.005 ? ARC_REACH : 0)) * k,
+      box: {
+        x0: at.x * k - width / 2, x1: at.x * k + width / 2,
+        y0: baseline - LABEL_PX * 0.85, y1: baseline + LABEL_PX * 0.25,
+      },
+      always: mark.hub || mark.focused || selected === at.id,
+      weight: (mark.lit ? 10_000 : 0) + at.r,
+    };
+  }));
+
   const branches = useMemo(() => {
     const seen = new Map<string, { key: string; label: string; total: number }>();
     for (const node of map.nodes.values()) {
@@ -377,9 +474,28 @@ export function MapView({ onOpen }: MapViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `spaceName` only reads `t`.
   }, [map, scope, t]);
 
+  /* The statuses there is something to show or hide for: counted before the
+     status filter itself, or a chip switched off would count nothing. */
+  const statusChips = useMemo(() => {
+    const counts = new Map<MapStatus, number>();
+    for (const node of map.nodes.values()) {
+      if (node.status !== null && inScope(node)) counts.set(node.status, (counts.get(node.status) ?? 0) + 1);
+    }
+    return MAP_STATUSES
+      .filter((status) => (counts.get(status) ?? 0) > 0 || looking.statuses.includes(status))
+      .map((status) => ({
+        status, label: t(STATUS_KEY[status]), count: counts.get(status) ?? 0, hint: t(WHY_KEY[status]),
+      }));
+  }, [map, inScope, looking.statuses, t]);
+
+  /* Hidden parts only count while they are parts of what is being looked at. */
+  const hiddenBranches = branches.filter((branch) => looking.hidden.includes(branch.key)).length;
+  const changed = Number(scope !== 'all') + Number(sizeBy === 'time')
+    + Number(looking.statuses.length > 0) + Number(hiddenBranches > 0) + Number(looking.legend);
+
   const load = useMemo(() => {
-    const shown = new Set(projects.map((node) => node.id));
-    return summariseLoad(items.filter((item) => !item.parent_id && shown.has(item.project_id)), childrenOf, null);
+    const counted = new Set(projects.map((node) => node.id));
+    return summariseLoad(items.filter((item) => !item.parent_id && counted.has(item.project_id)), childrenOf, null);
   }, [items, projects, childrenOf]);
 
   const near = lensProjects(map, 'near', { visible });
@@ -404,6 +520,7 @@ export function MapView({ onOpen }: MapViewProps) {
     setPrefs({ mapOngoing: { ...ongoing, [node.id]: !isOngoing(node.project, ongoing) } });
   };
 
+  const legendText = t('map.legend', { measure: t(sizeBy === 'time' ? 'map.legendTime' : 'map.legendTasks') });
   const swatch = (status: MapStatus) => <i className={`mapsw st-${status}`} aria-hidden="true" />;
 
   const row = (node: MapNode): ReactNode => (
@@ -515,48 +632,32 @@ export function MapView({ onOpen }: MapViewProps) {
 
   return (
     <div className="page wide map-page">
-      <PageHeader title={t('map.title')} load={load} />
-
-      <div className="mapbar">
-        {map.spaces.length > 1 && (
-          <div className="segmented small mapscope" role="group" aria-label={t('map.scope')}>
-            <button aria-pressed={scope === 'all'} onClick={() => setLooking((was) => ({ ...was, scope: 'all' }))}>
-              {t('map.scopeAll')}
-            </button>
-            {map.spaces.map((space) => (
-              <button
-                key={space.id} aria-pressed={scope === space.id}
-                onClick={() => setLooking((was) => ({ ...was, scope: space.id }))}
-              >
-                {spaceName(space.id, space.name)}
-              </button>
-            ))}
-          </div>
+      <PageHeader
+        title={t('map.title')}
+        load={load}
+        actions={(
+          <MapDisplayMenu
+            spaces={map.spaces.length > 1
+              ? map.spaces.map((space) => ({ id: space.id, label: spaceName(space.id, space.name) })) : []}
+            scope={scope}
+            onScope={(next) => setLooking((was) => ({ ...was, scope: next }))}
+            sizeBy={sizeBy}
+            canSizeByTime={anyTime}
+            onSize={(size) => setLooking((was) => ({ ...was, size }))}
+            statuses={statusChips}
+            hiddenStatuses={looking.statuses}
+            onStatus={flipStatus}
+            branches={branches}
+            hiddenBranches={looking.hidden}
+            onBranch={flipBranch}
+            legend={looking.legend}
+            onLegend={(legend) => setLooking((was) => ({ ...was, legend }))}
+            help={legendText}
+            changed={changed}
+            onReset={() => setLooking(defaultLooking())}
+          />
         )}
-        {anyTime && (
-          <div className="segmented small" role="group" aria-label={t('map.size')}>
-            <button aria-pressed={sizeBy === 'tasks'} onClick={() => setLooking((was) => ({ ...was, size: 'tasks' }))}>
-              <Icon name="tasks" size="sm" />{t('map.sizeTasks')}
-            </button>
-            <button aria-pressed={sizeBy === 'time'} onClick={() => setLooking((was) => ({ ...was, size: 'time' }))}>
-              <Icon name="clock" size="sm" />{t('map.sizeTime')}
-            </button>
-          </div>
-        )}
-        {branches.length > 1 && (
-          <div className="chiprow mapbranches" role="group" aria-label={t('map.branches')}>
-            {branches.map((branch) => (
-              <button
-                className="chip" key={branch.key}
-                aria-pressed={!looking.hidden.includes(branch.key)}
-                onClick={() => flipBranch(branch.key)}
-              >
-                {trim(branch.label, 36)} <small>{branch.total}</small>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      />
 
       <div className="mapstage">
         <div className="mapcanvas">
@@ -582,30 +683,24 @@ export function MapView({ onOpen }: MapViewProps) {
                   />
                 );
               })}
-              {drawn.map((at) => {
-                const node = map.nodes.get(at.id);
-                return node ? (
-                  <MapMark
-                    key={at.id} at={at} node={node} scale={view.k}
-                    label={nameOf(node)}
-                    value={node.kind === 'root' ? shownTotal : sizeBy === 'time' ? node.minutes : node.open}
-                    valueText={(value) => (sizeBy === 'time' && node.kind !== 'root'
-                      ? formatDuration(value, locale) : String(value))}
-                    tip={node.status
-                      ? t('map.tip', { status: t(STATUS_KEY[node.status]), open: node.open, done: node.done14 })
-                      : t('map.openCount', { count: node.kind === 'root' ? shownTotal : node.totalOpen })}
-                    selected={selected === at.id}
-                    above={nameAbove.has(at.id) && node.status === null}
-                    focused={inFocus.has(at.id)}
-                    lit={inLens !== null && inLens.has(at.id)}
-                    dim={inLens !== null && !inLens.has(at.id) && selected !== at.id}
-                    onPick={() => {
-                      if (gesture.current.dragged) return;
-                      select(node.status !== null ? node.id : null);
-                    }}
-                  />
-                ) : null;
-              })}
+              {marks.map((mark) => (
+                <MapMark
+                  key={mark.at.id} at={mark.at} node={mark.node} scale={view.k}
+                  text={mark.text} counted={mark.inside ? mark.counted : null}
+                  tip={`${mark.label} · ${mark.node.status
+                    ? t('map.tip', { status: t(STATUS_KEY[mark.node.status]), open: mark.node.open, done: mark.node.done14 })
+                    : t('map.openCount', { count: mark.total })}`}
+                  named={named.has(mark.at.id)}
+                  selected={selected === mark.at.id}
+                  above={mark.above}
+                  focused={mark.focused}
+                  dim={inLens !== null && !mark.lit && selected !== mark.at.id}
+                  onPick={() => {
+                    if (gesture.current.dragged) return;
+                    select(mark.node.status !== null ? mark.node.id : null);
+                  }}
+                />
+              ))}
             </g>
           </svg>
 
@@ -617,12 +712,14 @@ export function MapView({ onOpen }: MapViewProps) {
             <button className="btn sm" onClick={fit}>{t('map.fit')}</button>
           </div>
 
-          <div className="maplegend">
-            {MAP_STATUSES.map((status) => (
-              <span key={status} title={t(WHY_KEY[status])}>{swatch(status)}{t(STATUS_KEY[status])}</span>
-            ))}
-            <span>{t('map.legend', { measure: t(sizeBy === 'time' ? 'map.legendTime' : 'map.legendTasks') })}</span>
-          </div>
+          {looking.legend && (
+            <div className="maplegend">
+              {MAP_STATUSES.map((status) => (
+                <span key={status} title={t(WHY_KEY[status])}>{swatch(status)}{t(STATUS_KEY[status])}</span>
+              ))}
+              <span>{legendText}</span>
+            </div>
+          )}
         </div>
 
         <aside className="mappanel" aria-live="polite">
@@ -652,15 +749,17 @@ interface MapMarkProps {
   at: PlacedNode;
   node: MapNode;
   scale: number;
-  label: string;
-  value: number;
-  valueText: (value: number) => string;
+  /** The name, with what is counted beside it when that does not fit inside. */
+  text: string;
+  /** What is written inside the mark, or null when nothing is. */
+  counted: string | null;
   tip: string;
+  /** Whether the name is written out: it gives way when it would cover something. */
+  named: boolean;
   selected: boolean;
   /** Draws the name over the mark rather than under it. */
   above: boolean;
   focused: boolean;
-  lit: boolean;
   dim: boolean;
   onPick: () => void;
 }
@@ -668,30 +767,20 @@ interface MapMarkProps {
 /**
  * One mark: a project, or the hub of the projects around it.
  *
- * The label is a constant size on the screen whatever the zoom, and gives way
- * when its mark is too small to be told from its neighbours — unless the mark
- * is the one being asked about.
+ * The name is a constant size on the screen whatever the zoom, and is left
+ * out where it would run over another name or another project (`pickLabels`)
+ * — unless the mark is a hub, in focus, or the one being asked about.
  */
 function MapMark({
-  at, node, scale, label, value, valueText, tip, selected, above, focused, lit, dim, onPick,
+  at, node, scale, text, counted, tip, named, selected, above, focused, dim, onPick,
 }: MapMarkProps) {
   const hub = node.status === null;
   const root = node.kind === 'root';
-  const inside = root || (!hub && at.r >= 13 && value > 0);
   const size = LABEL_PX / scale;
-  /* A name needs about this much of the screen to itself to be read beside
-     its neighbours'; zoomed further out than that, only the hubs keep theirs. */
-  const room = Math.max(at.r + LABEL_ROOM, MIN_CLEAR) * scale;
-  const showLabel = hub || room >= 22 || selected || focused || lit;
-  const showCount = root || at.r * scale >= 8.5;
-  const counted = valueText(value);
+  const showCount = counted !== null && (root || at.r * scale >= 8.5);
   /* As large as the mark allows, and never wider than it. */
   const countSize = root ? 14
-    : Math.max(8, Math.min(at.r * 0.62, 19, (at.r * 1.7) / (Array.from(counted).length * 0.58)));
-  const text = root ? label
-    : hub ? `${trim(label, 22)} · ${node.totalOpen}`
-    : `${trim(label, 18)}${!inside && value > 0 ? ` · ${valueText(value)}` : ''}`;
-  const offset = focused ? 12 : node.finishable ? 7.5 : 2;
+    : Math.max(8, Math.min(at.r * 0.62, 19, (at.r * 1.7) / (Array.from(counted ?? '').length * 0.58 || 1)));
 
   return (
     <g
@@ -703,19 +792,19 @@ function MapMark({
       transform={`translate(${at.x} ${at.y})`}
       onClick={(event) => { event.stopPropagation(); onPick(); }}
     >
-      <title>{`${label} · ${tip}`}</title>
+      <title>{tip}</title>
       {focused && <circle className="mapmark-focus" r={at.r + 11} />}
       {node.finishable && node.progress > 0.005 && (
-        <path className="mapmark-arc" d={arcPath(at.r + 3, at.r + 6.5, node.progress)} />
+        <path className="mapmark-arc" d={arcPath(at.r + 3, at.r + ARC_REACH, node.progress)} />
       )}
       <circle className="mapmark-body" r={at.r} />
-      {inside && showCount && (
+      {showCount && (
         <text className="mapmark-count" fontSize={countSize}>{counted}</text>
       )}
-      {showLabel && (
+      {named && (
         <text
           className="mapmark-label" fontSize={size} strokeWidth={3.2 / scale}
-          y={above ? -(at.r + 6 / scale) : at.r + offset + size + 2 / scale}
+          y={above ? -(at.r + 6 / scale) : at.r + labelOffset(node, focused) + size + 2 / scale}
         >
           {text}
         </text>
