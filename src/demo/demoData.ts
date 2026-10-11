@@ -187,6 +187,74 @@ const COPY: Record<Locale, Copy> = {
       'Reply to applicants', 'Clean the database', 'Follow up with the client',
       'Write the notes', 'Book the restaurant', 'Renew the domain',
     ],
+  },  nl: {
+    person: 'Robin de Wit',
+    email: 'robin@demo.test',
+    workspace: 'Studio Robin',
+    projects: {
+      inbox: 'Inbox',
+      personal: 'Persoonlijk',
+      home: 'Thuis',
+      site: 'Website',
+      siteDescription:
+        'De site helemaal opnieuw opbouwen.\n\n- Nieuw grid\n- Kortere teksten\n- Blog overgezet',
+      homeDescription: 'Onderhoud, boodschappen en kleine klusjes.',
+      clients: 'Klantwerk',
+      clientA: 'Boekhandel Vermiljoen',
+      clientB: 'Studio Leisteen',
+    },
+    sections: [
+      { name: 'Te doen', description: 'Alles wat klaarstaat om te beginnen.' },
+      { name: 'Bezig', description: 'Hier hooguit twee taken, anders beweegt er niets.' },
+      { name: 'Nakijken' },
+    ],
+    parent: {
+      title: 'De homepage opnieuw opbouwen',
+      description: 'Drie blokken, elk één idee.',
+      children: ['De teksten schrijven', 'De afbeeldingen kiezen', 'De indeling bouwen'],
+    },
+    tasks: [
+      ['De offerte nakijken voor verzending', 'Controleer de aantallen en **de geldigheidsdatum**.'],
+      ['De kick-off voorbereiden', 'Voor het gesprek:\n- [x] De context samenvatten\n- [ ] Het plan doorlopen\n- [ ] De benodigde beslissingen op een rij zetten'],
+      ['De factuur van deze maand versturen', ''],
+      ['Het lettertype van de site kiezen', 'Vergelijk twee families op een echt scherm, niet in de editor.'],
+      ['De planten water geven', ''],
+      ['Het oud papier buiten zetten', ''],
+      ['Een back-up van de foto’s maken', 'Kopieer naar de externe schijf en open daarna één bestand ter controle.'],
+      ['De garage bellen', ''],
+      ['Het portfolio bijwerken', 'Voeg de laatste twee projecten toe en kort de teksten in.'],
+      ['Het kwartaalrapport lezen', ''],
+      ['De trein voor november boeken', 'Vermijd overstappen van minder dan twintig minuten.'],
+      ['De mailbox leegmaken', ''],
+      ['De demo voorbereiden', 'Eén onderwerp per scherm, sluit af met de vervolgstappen.'],
+      ['De herinneringen automatiseren', ''],
+      ['Wachten op de huismeester', ''],
+      ['Het contactformulier repareren', 'Het telefoonveld accepteert nog steeds letters.'],
+      ['De projectnotitie schrijven', 'Context, benodigde beslissing, opties, advies.'],
+      ['Het bureau opruimen', ''],
+      ['De lunch van zaterdag plannen', ''],
+      ['De schattingen nalopen', ''],
+      ['Het stuk over gewoontes publiceren', 'Lees het hardop voor het online gaat.'],
+      ['Het bed verschonen', ''],
+      ['De back-ups controleren', ''],
+      ['De vrije dagen plannen', ''],
+      ['Visitekaartjes bestellen', ''],
+    ],
+    quick: [
+      'De drukker antwoorden', 'De oude ontwerpen archiveren', 'De parkeerboete betalen',
+      'De bibliotheekpas verlengen', 'Het bedankkaartje sturen',
+    ],
+    dust: [
+      'De basis van houtbewerking leren', 'De gang opnieuw schilderen', 'De familiealbums digitaliseren',
+      'De opzet van het boek schrijven', 'Het oude beeldscherm verkopen',
+    ],
+    completed: [
+      'Het voorstel nakijken', 'De offerte versturen', 'De bank bellen', 'De kledingkast uitzoeken',
+      'Het cv bijwerken', 'De nieuwsbrief versturen', 'Het abonnement betalen',
+      'De fiets repareren', 'De foto’s uitzoeken', 'De vergadering voorbereiden', 'Boodschappen doen',
+      'Sollicitanten antwoorden', 'De database opschonen', 'De klant opvolgen',
+      'De notities uitwerken', 'Het restaurant reserveren', 'Het domein verlengen',
+    ],
   },
 };
 
@@ -291,8 +359,8 @@ export function buildDemoSnapshot(locale: Locale = 'en', seed = 20260914): Snaps
     is_recurring: !!recurring,
   });
 
-  const everyWeek = locale === 'fr' ? 'tous les lundis' : 'every Monday';
-  const everyDay = locale === 'fr' ? 'tous les jours' : 'every day';
+  const everyWeek = { en: 'every Monday', fr: 'tous les lundis', nl: 'elke maandag' }[locale];
+  const everyDay = { en: 'every day', fr: 'tous les jours', nl: 'elke dag' }[locale];
 
   // A spread that exercises every rule: overdue, quick, timed, week, backlog.
   const plan: Array<Partial<Item>> = [

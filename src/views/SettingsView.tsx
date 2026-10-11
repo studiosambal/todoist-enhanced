@@ -16,7 +16,7 @@ import { DATE_FORMATS, formatDay, type DateFormat } from '@/domain/dates';
 import { HOME_VIEWS, type HomeView } from '@/store/prefs';
 import { DEFAULT_WEEK_LABEL } from '@/domain/types';
 import { DUST_MONTHS, isDustMonths } from '@/domain/views';
-import type { Locale, TranslationKey } from '@/i18n';
+import { LOCALES, LOCALE_NAMES, type Locale, type TranslationKey, intlLocale } from '@/i18n';
 import { APP_NAME, AUTHOR, AUTHOR_AVATAR_URL, COFFEE_URL, GITHUB_URL, VERSION } from '@/app-info';
 import { karmaStanding } from '@/domain/karma';
 import { projectTree } from '@/store/selectors';
@@ -55,7 +55,7 @@ export function SettingsView() {
 
   const current = useCurrentSection();
   const avatar = avatarUrl(user);
-  const intl = locale === 'fr' ? 'fr-FR' : 'en-GB';
+  const intl = intlLocale(locale);
 
   /* Monday-first labels. 8 January 2024 was a Monday; the capacity array is
      indexed Sunday-first, so the two are mapped rather than assumed equal. */
@@ -192,10 +192,7 @@ export function SettingsView() {
                 label={t('settings.language')}
                 value={prefs.locale}
                 onChange={(value) => setLocale(value as Locale)}
-                options={[
-                  { value: 'en', label: 'English' },
-                  { value: 'fr', label: 'Français' },
-                ]}
+                options={LOCALES.map((value) => ({ value, label: LOCALE_NAMES[value] }))}
               />
             </Row>
 

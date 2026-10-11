@@ -25,18 +25,18 @@ export function advanceDemoRecurrence(snapshot: Snapshot, id: string): Snapshot 
   if (!current) return snapshot;
 
   const rule = item.due.string.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const opener = '(?:every|each|tous les|toutes les|tous le|chaque)\\s+';
-  const weekdays = [...WEEKDAY_WORDS.en, ...WEEKDAY_WORDS.fr];
-  // Both lists start on Sunday, as `Date.getDay()` does, so the index is the day.
+  const opener = '(?:every|each|tous les|toutes les|tous le|chaque|elke|elk)\\s+';
+  const weekdays = [...WEEKDAY_WORDS.en, ...WEEKDAY_WORDS.fr, ...WEEKDAY_WORDS.nl];
+  // Every list starts on Sunday, as `Date.getDay()` does, so the index is the day.
   const named = weekdays.findIndex((words) => new RegExp(`${opener}(?:${words})\\b`).test(rule));
 
   let next: Date;
-  if (/\b(?:every day|daily|tous les jours|chaque jour|quotidien(?:ne)?)\b/.test(rule)) {
+  if (/\b(?:every day|daily|tous les jours|chaque jour|quotidien(?:ne)?|elke dag|dagelijks)\b/.test(rule)) {
     next = addDays(current, 1);
   } else if (named >= 0) {
     // "every Monday": the next Monday after the date it stands on.
     next = nextDay(current, (named % 7) as Day);
-  } else if (/\b(?:every week|weekly|chaque semaine|hebdomadaire)\b/.test(rule)) {
+  } else if (/\b(?:every week|weekly|chaque semaine|hebdomadaire|elke week|wekelijks)\b/.test(rule)) {
     next = addWeeks(current, 1);
   } else {
     next = addDays(current, 1);
@@ -302,7 +302,9 @@ export function explainFailure(error: string, locale: Locale): string {
   if (/^item not found$/i.test(said)) {
     return locale === 'fr'
       ? 'Todoist ne permet pas à ce compte de modifier cette tâche (souvent un projet d’équipe que vous voyez sans l’avoir rejoint). Rien n’a été enregistré.'
-      : 'Todoist does not let this account change this task (often a team project you can see but have not joined). Nothing was saved.';
+      : locale === 'nl'
+        ? 'Todoist laat dit account deze taak niet wijzigen (vaak een teamproject dat je wel ziet maar waar je geen lid van bent). Er is niets opgeslagen.'
+        : 'Todoist does not let this account change this task (often a team project you can see but have not joined). Nothing was saved.';
   }
   if (locale === 'fr') {
     /* Todoist's sentence is English, and a French message with an English
@@ -322,6 +324,23 @@ export function explainFailure(error: string, locale: Locale): string {
     return said
       ? `Todoist a refusé cette modification (« ${said} »). Elle n’a pas été enregistrée.`
       : 'Todoist a refusé cette modification. Elle n’a pas été enregistrée.';
+  }
+  if (locale === 'nl') {
+    /* As in French: the limit is named in Dutch from what it counts, and
+       anything else keeps Todoist's own words, quoted. */
+    if (limit) {
+      const what = /project/i.test(said) ? ' voor projecten'
+        : /section/i.test(said) ? ' voor secties'
+          : /label|tag/i.test(said) ? ' voor labels'
+            : /comment|note/i.test(said) ? ' voor opmerkingen'
+              : /collaborator|member/i.test(said) ? ' voor medewerkers'
+                : /task|item/i.test(said) ? ' voor taken'
+                  : '';
+      return `Limiet${what} bereikt: dit is een limiet van je Todoist-account of werkruimte, niet van deze app. De wijziging is niet opgeslagen.`;
+    }
+    return said
+      ? `Todoist heeft deze wijziging geweigerd (“${said}”). Ze is niet opgeslagen.`
+      : 'Todoist heeft deze wijziging geweigerd. Ze is niet opgeslagen.';
   }
   const english = said || 'Todoist refused it';
   return limit
@@ -346,7 +365,9 @@ export function explainFailures(
   if (saved <= 0) return reason;
   return locale === 'fr'
     ? `${saved} modification${saved > 1 ? 's' : ''} sur ${total} enregistrée${saved > 1 ? 's' : ''}. ${reason}`
-    : `${saved} of ${total} changes saved. ${reason}`;
+    : locale === 'nl'
+      ? `${saved} van de ${total} wijzigingen opgeslagen. ${reason}`
+      : `${saved} of ${total} changes saved. ${reason}`;
 }
 
 /** The collection a command acts on, read from its type. */

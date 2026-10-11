@@ -8,7 +8,7 @@ import { FEEDBACK_URL } from '@/app-info';
  * with no message and no way to say what happened. This says that something
  * broke, offers the one thing that usually fixes it, and links the bug form.
  *
- * The words are written here, in both languages, rather than looked up: the
+ * The words are written here, in every language, rather than looked up: the
  * translation hook may be exactly what failed. The language is the one the page
  * already wears. It borrows the connect screen's look and adds none of its own.
  */
@@ -24,6 +24,12 @@ const WORDS = {
     body: "La page a rencontré un problème et n'a pas pu continuer. La recharger le règle en général.",
     reload: 'Recharger',
     report: 'Nous dire ce qui s\'est passé',
+  },
+  nl: {
+    title: 'Er ging iets mis',
+    body: 'De pagina liep tegen een probleem aan en kon niet verder. Opnieuw laden lost het meestal op.',
+    reload: 'Opnieuw laden',
+    report: 'Vertel ons wat er gebeurde',
   },
 } as const;
 
@@ -42,7 +48,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
   render() {
     if (!this.state.failed) return this.props.children;
-    const lang = document.documentElement.lang?.startsWith('fr') ? 'fr' : 'en';
+    const page = document.documentElement.lang ?? '';
+    const lang = page.startsWith('fr') ? 'fr' : page.startsWith('nl') ? 'nl' : 'en';
     const words = WORDS[lang];
     return (
       <div className="connect" role="alert">

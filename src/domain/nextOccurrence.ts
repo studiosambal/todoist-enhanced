@@ -26,28 +26,28 @@ import type { Item } from './types';
 const fold = (text: string): string =>
   text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 
-const OPENER = '(?:every|each|tous les|toutes les|tous le|chaque)';
-const UNIT_DAY = '(?:days?|jours?)';
-const UNIT_WEEK = '(?:weeks?|semaines?)';
-const WORKDAY = '(?:weekdays?|workdays?|working days?|jours? ouvres?|jours? ouvrables?|jours? de semaine)';
-/* "at 9am", "at 20:00", "à 9h30": the time of day does not move the date. */
-const TIME = '(?:\\s+(?:at|@|a|vers)\\s+[\\d:h.]+\\s*(?:am|pm)?)?';
+const OPENER = '(?:every|each|tous les|toutes les|tous le|chaque|elke|elk|iedere|ieder)';
+const UNIT_DAY = '(?:days?|jours?|dag(?:en)?)';
+const UNIT_WEEK = '(?:weeks?|semaines?|weken)';
+const WORKDAY = '(?:weekdays?|workdays?|working days?|jours? ouvres?|jours? ouvrables?|jours? de semaine|werkdag(?:en)?|weekdag(?:en)?)';
+/* "at 9am", "at 20:00", "à 9h30", "om 9:00": the time of day does not move the date. */
+const TIME = '(?:\\s+(?:at|@|a|vers|om)\\s+[\\d:h.]+\\s*(?:am|pm)?)?';
 
-const weekdayAlternatives = [...WEEKDAY_WORDS.en, ...WEEKDAY_WORDS.fr];
+const weekdayAlternatives = [...WEEKDAY_WORDS.en, ...WEEKDAY_WORDS.fr, ...WEEKDAY_WORDS.nl];
 const WEEKDAY_ONE = `(?:${weekdayAlternatives.join('|')})`;
 const WEEKDAY_LIST = new RegExp(
-  `^${OPENER}\\s+(${WEEKDAY_ONE}(?:\\s*(?:,|and|et)\\s*${WEEKDAY_ONE})*)${TIME}$`,
+  `^${OPENER}\\s+(${WEEKDAY_ONE}(?:\\s*(?:,|and|et|en)\\s*${WEEKDAY_ONE})*)${TIME}$`,
 );
-const DAILY = new RegExp(`^(?:daily|quotidien(?:ne)?|${OPENER}\\s+${UNIT_DAY})${TIME}$`);
+const DAILY = new RegExp(`^(?:daily|quotidien(?:ne)?|dagelijks|${OPENER}\\s+${UNIT_DAY})${TIME}$`);
 const EVERY_N_DAYS = new RegExp(`^${OPENER}\\s+(\\d{1,3})\\s+${UNIT_DAY}${TIME}$`);
-const WEEKLY = new RegExp(`^(?:weekly|hebdomadaire|${OPENER}\\s+${UNIT_WEEK})${TIME}$`);
+const WEEKLY = new RegExp(`^(?:weekly|hebdomadaire|wekelijks|${OPENER}\\s+${UNIT_WEEK})${TIME}$`);
 const EVERY_N_WEEKS = new RegExp(`^${OPENER}\\s+(\\d{1,2})\\s+${UNIT_WEEK}${TIME}$`);
 const WORKDAYS = new RegExp(`^${OPENER}\\s+${WORKDAY}${TIME}$`);
 
 /** The days of the week a list names, Sunday = 0, or null if a word is not one. */
 function namedDays(list: string): number[] | null {
   const days = new Set<number>();
-  for (const word of list.split(/\s*(?:,|and|et)\s*/)) {
+  for (const word of list.split(/\s*(?:,|\band\b|\bet\b|\ben\b)\s*/)) {
     const at = weekdayAlternatives.findIndex((alternatives) =>
       new RegExp(`^(?:${alternatives})$`).test(word.trim()));
     if (at < 0) return null;

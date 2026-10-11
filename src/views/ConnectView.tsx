@@ -6,7 +6,7 @@ import { useT } from '@/hooks/useT';
 import { useStore } from '@/store/store';
 import { looksLikeToken } from '@/api/auth';
 import { beginSignIn, builtForElsewhere } from '@/api/oauth';
-import type { TranslationKey } from '@/i18n';
+import { LOCALES, LOCALE_NAMES, type TranslationKey } from '@/i18n';
 import { AUTHOR, GITHUB_URL, TODOIST_DEVELOPER_URL, VERSION } from '@/app-info';
 
 
@@ -53,9 +53,9 @@ export function ConnectView() {
   return (
     <div className="signin">
       <div className="signin-lang seg2" role="group" aria-label={t('settings.language')}>
-        {(['en', 'fr'] as const).map((value) => (
+        {LOCALES.map((value) => (
           <button key={value} aria-pressed={locale === value} onClick={() => setLocale(value)}>
-            {value === 'en' ? 'English' : 'Français'}
+            {LOCALE_NAMES[value]}
           </button>
         ))}
       </div>
